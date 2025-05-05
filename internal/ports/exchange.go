@@ -85,4 +85,7 @@ type ExchangeClient interface {
 
 	// GetKlines retrieves historical klines/candlestick data for the given symbol.
 	GetKlines(ctx context.Context, symbol string, interval string, limit int) ([]*domain.Kline, error)
+
+	// CancelOrder cancels an existing open order by its ID.
+	CancelOrder(ctx context.Context, symbol string, orderID int64) (*OrderResponse, error) // Returns details of the cancelled order
 }

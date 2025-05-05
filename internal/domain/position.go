@@ -16,6 +16,11 @@ type Position struct {
 	ExitTime   time.Time      // Timestamp when the position was exited (zero value if open)
 	Status     PositionStatus // Current status (open, closed)
 	PNL        float64        // Profit and Loss for the position (calculated on close)
+
+	// Associated order IDs for SL/TP management (nullable in DB)
+	StopLossOrderID   *string     `db:"stop_loss_order_id"`
+	TakeProfitOrderID *string     `db:"take_profit_order_id"`
+	CloseReason       CloseReason `db:"close_reason"` // Reason for closing (SL, TP, Manual, etc.)
 }
 
 // IsOpen checks if the position status is open.

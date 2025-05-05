@@ -20,12 +20,13 @@ type Config struct {
 	IsTestnet bool
 
 	// Trading Parameters
-	Symbol     string
-	Leverage   int
-	Quantity   float64 // Default quantity if not using dynamic sizing
-	MaxOrders  int     // Max trades per day
-	StopLoss   float64 // Stop loss percentage (e.g., 0.0025 for 0.25%)
-	TakeProfit float64 // Take profit percentage (e.g., 0.01 for 1%)
+	Symbol    string
+	Leverage  int
+	Quantity  float64 // Default quantity if not using dynamic sizing
+	MaxOrders int     // Max trades per day
+	StopLoss  float64 // Stop loss percentage (e.g., 0.0025 for 0.25%)
+	MinProfit float64 // Minimum profit target percentage (e.g., 0.01 for 1%)
+	MaxProfit float64 // Maximum profit target percentage (e.g., 0.03 for 3%)
 
 	// Strategy Parameters
 	StrategyShortMAPeriod int     // e.g., 20
@@ -105,12 +106,23 @@ func LoadConfig() (*Config, error) {
 		errs = append(errs, "STOP_LOSS must be between 0.0 and 1.0 (exclusive)")
 	}
 
-	// Note: Renamed MIN_PROFIT/MAX_PROFIT in README to just TAKE_PROFIT for simplicity here
-	cfg.TakeProfit, err = getEnvAsFloatRequired("TAKE_PROFIT", 0.01)
+	// Load Min/Max Profit targets
+	cfg.MinProfit, err = getEnvAsFloatRequired("MIN_PROFIT", 0.01) // Default 1%
 	if err != nil {
-		errs = append(errs, fmt.Sprintf("invalid TAKE_PROFIT: %v", err))
-	} else if cfg.TakeProfit <= 0 {
-		errs = append(errs, "TAKE_PROFIT must be positive")
+		errs = append(errs, fmt.Sprintf("invalid MIN_PROFIT: %v", err))
+	} else if cfg.MinProfit <= 0 {
+		errs = append(errs, "MIN_PROFIT must be positive")
+	}
+
+	cfg.MaxProfit, err = getEnvAsFloatRequired("MAX_PROFIT", 0.03) // Default 3%
+	if err != nil {
+		errs = append(errs, fmt.Sprintf("invalid MAX_PROFIT: %v", err))
+	} else if cfg.MaxProfit <= 0 {
+		errs = append(errs, "MAX_PROFIT must be positive")
+	}
+
+	if cfg.MinProfit >= cfg.MaxProfit {
+		errs = append(errs, "MIN_PROFIT must be less than MAX_PROFIT")
 	}
 
 	// Strategy Parameters (using defaults if not set)

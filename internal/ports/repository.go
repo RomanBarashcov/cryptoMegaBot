@@ -24,12 +24,14 @@ type PositionRepository interface {
 	GetTotalProfit(ctx context.Context) (float64, error)
 }
 
-// TradeRepository defines the interface for storing and retrieving completed trades.
+// TradeRepository defines the interface for querying trade-related data, now primarily from the positions table.
 type TradeRepository interface {
-	// CreateTrade saves a new trade record and returns its assigned ID.
-	CreateTrade(ctx context.Context, trade *domain.Trade) (int64, error)
-	// FindBySymbol retrieves the most recent trades for a given symbol, up to a limit.
-	FindBySymbol(ctx context.Context, symbol string, limit int) ([]*domain.Trade, error)
-	// CountTodayBySymbol counts the number of trades executed today for a given symbol.
+	// CreateTrade is removed - handled by PositionRepository.Update when closing.
+
+	// FindClosedBySymbol retrieves the most recent *closed* positions for a given symbol, up to a limit.
+	// Note: Returns domain.Position objects which contain trade details.
+	FindClosedBySymbol(ctx context.Context, symbol string, limit int) ([]*domain.Position, error)
+
+	// CountTodayBySymbol counts the number of *closed* positions executed today for a given symbol.
 	CountTodayBySymbol(ctx context.Context, symbol string) (int, error)
 }

@@ -501,6 +501,46 @@ func (c *Client) GetKlines(ctx context.Context, symbol string, interval string, 
 	return domainKlines, nil
 }
 
+// CancelOrder cancels an open order on Binance.
+func (c *Client) CancelOrder(ctx context.Context, symbol string, orderID int64) (*ports.OrderResponse, error) {
+	op := "CancelOrder"
+	c.logger.Debug(ctx, "Attempting to cancel order", map[string]interface{}{"symbol": symbol, "orderID": orderID})
+
+	res, err := c.futuresClient.NewCancelOrderService().
+		Symbol(symbol).
+		OrderID(orderID).
+		Do(ctx)
+	if err != nil {
+		// Handle specific error for "Order does not exist" if needed,
+		// but handleError should map -2013 to ErrOrderNotFound.
+		// Handle specific error for "Order does not exist" if needed,
+		// but handleError should map -2013 to ErrOrderNotFound.
+		// Handle specific error for "Order does not exist" if needed,
+		// but handleError should map -2013 to ErrOrderNotFound.
+		return nil, c.handleError(ctx, err, op)
+	}
+
+	// Manually create a CreateOrderResponse from CancelOrderResponse fields
+	// as direct casting is not allowed.
+	createOrderResp := &futures.CreateOrderResponse{
+		OrderID:       res.OrderID,
+		Symbol:        res.Symbol,
+		ClientOrderID: res.ClientOrderID,
+		Price:         res.Price,
+		OrigQuantity:  res.OrigQuantity,
+		Status:        res.Status, // Should be CANCELED
+		TimeInForce:   res.TimeInForce,
+		Type:          res.Type,
+		Side:          res.Side,
+		// Fields like AvgPrice, ExecutedQuantity, UpdateTime are not in CancelOrderResponse
+		// They will default to zero values in createOrderResp, which is fine.
+	}
+
+	resp := translateOrderResponse(createOrderResp)
+	c.logger.Info(ctx, op+" successful", map[string]interface{}{"symbol": symbol, "orderID": orderID, "status": resp.Status})
+	return resp, nil
+}
+
 // --- Translation Helpers ---
 
 func translateOrderResponse(order *futures.CreateOrderResponse) *ports.OrderResponse {

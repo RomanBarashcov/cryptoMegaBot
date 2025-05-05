@@ -3,7 +3,8 @@ package strategy
 import (
 	"context"
 	"fmt"
-	"math"
+
+	// "math" was removed by auto-formatter, confirming removal
 
 	"cryptoMegaBot/internal/domain"
 	"cryptoMegaBot/internal/ports"
@@ -38,6 +39,20 @@ func New(cfg Config, logger ports.Logger) (*Strategy, error) {
 		return nil, fmt.Errorf("short term MA period must be less than long term MA period")
 	}
 	return &Strategy{cfg: cfg, logger: logger}, nil
+}
+
+// RequiredDataPoints returns the minimum number of klines needed for the strategy calculations.
+// It's the max of all indicator periods + 1 (for RSI lookback).
+func (s *Strategy) RequiredDataPoints() int {
+	maxPeriod := s.cfg.LongTermMAPeriod // Start with LongTermMA
+	if s.cfg.EMAPeriod > maxPeriod {
+		maxPeriod = s.cfg.EMAPeriod
+	}
+	if s.cfg.RSIPeriod > maxPeriod {
+		maxPeriod = s.cfg.RSIPeriod
+	}
+	// RSI calculation looks one step further back than its period
+	return maxPeriod + 1
 }
 
 // calculateRSI calculates the Relative Strength Index (RSI).
@@ -119,12 +134,10 @@ func calculateEMA(klines []*domain.Kline, period int) (float64, error) {
 // ShouldEnterTrade implements the logic to decide if a trade should be entered.
 // It now uses the injected configuration and logger.
 func (s *Strategy) ShouldEnterTrade(ctx context.Context, klines []*domain.Kline, currentPrice float64) bool {
-	requiredDataPoints := int(math.Max(float64(s.cfg.LongTermMAPeriod), float64(s.cfg.RSIPeriod)))
-	requiredDataPoints = int(math.Max(float64(requiredDataPoints), float64(s.cfg.EMAPeriod)))
-
-	if len(klines) <= requiredDataPoints { // Need one extra point for RSI calculation
+	requiredPoints := s.RequiredDataPoints()
+	if len(klines) < requiredPoints {
 		s.logger.Debug(ctx, "Not enough kline data for strategy evaluation",
-			map[string]interface{}{"available": len(klines), "required": requiredDataPoints + 1})
+			map[string]interface{}{"available": len(klines), "required": requiredPoints})
 		return false
 	}
 
