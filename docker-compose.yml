@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  sqlite:
+    image: alpine:latest
+    container_name: trading_sqlite
+    volumes:
+      - ./data:/data
+      - ./init.sql:/init.sql
+    environment:
+      - SQLITE_DATABASE=/data/trading_bot.db
+    command: >
+      sh -c "apk add --no-cache sqlite &&
+             touch /data/trading_bot.db &&
+             sqlite3 /data/trading_bot.db '.read /init.sql' &&
+             tail -f /dev/null"
+    ports:
+      - "12345:12345"  # if you need to access SQLite remotely
+
+volumes:
+  data:
+    driver: local 
