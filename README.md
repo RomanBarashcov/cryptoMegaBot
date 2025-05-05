@@ -4,26 +4,41 @@ A cryptocurrency trading bot that automatically trades ETH futures on Binance wi
 
 ## Features
 
-- Real-time price updates via WebSocket
-- Automated trading with fixed position size (1 ETH)
-- Risk management with stop-loss and take-profit orders
-- Daily trade limit (5 trades per day)
-- 4x leverage for increased potential returns
-- SQLite database for trade history
-- Configurable trading parameters
+- **Clean Architecture:** Built using Ports & Adapters for maintainability and testability.
+- **Real-time Price Updates:** Utilizes Binance WebSocket API.
+- **Automated Trading:** Executes trades based on configurable strategies.
+- **Strategy Framework:**
+    - Supports multiple trading strategies (e.g., MA Crossover implemented).
+    - Includes technical indicators (Moving Averages, RSI).
+    - Backtesting engine for strategy evaluation.
+    - Optimization framework for parameter tuning.
+    - Performance analytics module.
+- **Risk Management:**
+    - Dedicated Risk Manager module.
+    - Configurable stop-loss and take-profit orders.
+    - Daily trade limits.
+    - Position sizing (currently fixed default, dynamic planned).
+- **Persistence:** Uses SQLite database via Repository pattern for trade history and positions.
+- **Configuration:** Highly configurable via environment variables (`.env` file).
+- **Concurrency:** Leverages Go's concurrency features for efficient operation.
+- **Containerization:** Docker support via `docker-compose.yml`.
+- **Testing:** Includes unit tests for core components (coverage ongoing).
 
-## Trading Strategy
+## Trading Strategy Framework
 
-- Fixed position size: 1 ETH per trade
-- Target profit: 1-3% per trade ($40-$120 at current ETH prices)
-- Stop loss: 0.25% ($10 at current ETH prices)
-- Maximum 5 trades per day
-- 4x leverage for increased potential returns
-- Trades only when:
-  - Price is trending up
-  - Volatility is moderate
-  - No open positions
-  - Daily trade limit not reached
+The bot employs a flexible strategy framework allowing different algorithms to be implemented and selected.
+
+- **Core Components:** Located in `internal/strategy`.
+- **Available Indicators:** Moving Averages (SMA/EMA), Relative Strength Index (RSI). More can be added.
+- **Example Strategy:** A Moving Average Crossover strategy (`internal/strategy/strategies/ma_crossover.go`) is provided as an example.
+- **Evaluation Tools:** Includes backtesting (`internal/strategy/backtesting`) and parameter optimization (`internal/strategy/optimization`) capabilities.
+- **Configuration:** Specific strategy parameters (like MA periods, RSI thresholds) are typically configured via environment variables (see `.env.example` and `config/config.go`).
+- **Default Behavior (Configurable):**
+    - Position Size: Fixed (e.g., 1.0 ETH), configurable via `QUANTITY`. Dynamic sizing is planned.
+    - Stop Loss: Configurable percentage via `STOP_LOSS` (e.g., 0.0025 for 0.25%).
+    - Take Profit: Configurable range via `MIN_PROFIT`, `MAX_PROFIT`.
+    - Daily Limit: Max trades per day via `MAX_ORDERS`.
+    - Leverage: Configurable via `LEVERAGE`.
 
 ## Technical Requirements
 
@@ -31,50 +46,87 @@ A cryptocurrency trading bot that automatically trades ETH futures on Binance wi
 - SQLite3
 - Binance Futures account with API access
 
-## Installation
+## Installation & Running
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/cryptoMegaBot.git
-cd cryptoMegaBot
-```
+### Prerequisites
+- Go (version specified in `go.mod`, e.g., 1.16+)
+- Git
+- SQLite3 development libraries (for `mattn/go-sqlite3`)
+- Docker & Docker Compose (Optional, for containerized deployment)
 
-2. Install dependencies:
-```bash
-go mod download
-```
+### Local Setup
 
-3. Create and configure your environment file:
-```bash
-cp .env.example .env
-```
-Edit `.env` with your Binance API keys and preferred trading parameters.
+1.  **Clone:**
+    ```bash
+    git clone https://github.com/yourusername/cryptoMegaBot.git # Replace with actual repo URL
+    cd cryptoMegaBot
+    ```
+2.  **Dependencies:**
+    ```bash
+    go mod download
+    ```
+3.  **Configuration:**
+    ```bash
+    cp .env.example .env
+    # Edit .env with your Binance API keys and desired parameters
+    ```
+4.  **Data Directory:** (If using local SQLite)
+    ```bash
+    mkdir -p data
+    ```
+5.  **Build & Run (using Makefile):**
+    ```bash
+    # Build the executable
+    make build
 
-4. Create data directory:
-```bash
-mkdir -p data
-```
+    # Run the built executable
+    ./cryptoMegaBot
+    ```
+    *Alternatively, run directly (slower):*
+    ```bash
+    make run
+    # Or: go run cmd/main.go (adjust path to main entry point if needed)
+    ```
 
-5. Run the bot:
-```bash
-go run main.go
-```
+### Docker Setup
+
+1.  **Configuration:** Ensure `.env` is created and configured as above.
+2.  **Build & Run:**
+    ```bash
+    docker-compose build
+    docker-compose up -d
+    ```
+3.  **View Logs:**
+    ```bash
+    docker-compose logs -f
+    ```
+4.  **Stop:**
+    ```bash
+    docker-compose down
+    ```
 
 ## Configuration
 
-The bot can be configured using environment variables in the `.env` file:
+Configuration is managed via environment variables, typically loaded from an `.env` file using `godotenv`. See `.env.example` for a full list of available parameters. Key variables include:
 
-- `BINANCE_API_KEY`: Your Binance API key
-- `BINANCE_API_SECRET`: Your Binance API secret
-- `SYMBOL`: Trading pair (default: ETHUSDT)
-- `LEVERAGE`: Trading leverage (default: 4)
-- `QUANTITY`: Position size in ETH (default: 1.0)
-- `MAX_ORDERS`: Maximum trades per day (default: 5)
-- `MIN_PROFIT`: Minimum profit target (default: 0.01 or 1%)
-- `MAX_PROFIT`: Maximum profit target (default: 0.03 or 3%)
-- `STOP_LOSS`: Stop loss percentage (default: 0.0025 or 0.25%)
-- `DB_PATH`: Path to SQLite database (default: ./data/trading_bot.db)
-- `LOG_LEVEL`: Logging level (default: info)
+- **API Credentials:**
+    - `BINANCE_API_KEY`: Your Binance API key.
+    - `BINANCE_API_SECRET`: Your Binance API secret.
+- **Trading Parameters:**
+    - `SYMBOL`: Trading pair (e.g., `ETHUSDT`).
+    - `LEVERAGE`: Desired leverage.
+    - `QUANTITY`: Position size (e.g., in ETH for ETHUSDT).
+- **Risk Management:**
+    - `MAX_ORDERS`: Maximum trades per day.
+    - `STOP_LOSS`: Stop loss percentage (e.g., `0.0025` for 0.25%).
+    - `MIN_PROFIT`, `MAX_PROFIT`: Take profit range percentages.
+- **Strategy Parameters:** (Specific variables depend on the chosen strategy, e.g., MA periods for MA Crossover)
+    - `STRATEGY_NAME`: Identifier for the strategy to use (e.g., `ma_crossover`).
+    - *(Strategy-specific params like `MA_SHORT_PERIOD`, `MA_LONG_PERIOD`, `RSI_PERIOD`, etc.)*
+- **Technical:**
+    - `DB_PATH`: Path to SQLite database file.
+    - `LOG_LEVEL`: Logging verbosity (e.g., `debug`, `info`, `warn`, `error`).
+    - `TESTNET_ENABLED`: Set to `true` to use Binance Testnet.
 
 ## Risk Warning
 
@@ -93,4 +145,4 @@ Always:
 
 ## License
 
-MIT License 
+MIT License
