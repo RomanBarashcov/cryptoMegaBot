@@ -31,9 +31,9 @@ The Crypto Trading Bot is an automated trading system designed to trade ETH futu
 
 ### In Scope
 - ETH futures trading on Binance
-- Fixed position size trading (1 ETH per trade)
+- Position sizing (currently fixed by default, e.g., 1 ETH per trade; dynamic sizing planned)
 - Stop-loss and take-profit order management
-- Daily trade limits
+- Daily trade limits (via Risk Manager)
 - Trade history recording and reporting
 - Configuration via environment variables
 

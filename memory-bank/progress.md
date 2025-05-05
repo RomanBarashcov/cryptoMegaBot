@@ -6,78 +6,83 @@
 - ✅ Configuration loading from environment variables
 - ✅ Database initialization and schema creation
 - ✅ Connection to Binance Futures API
-- ✅ WebSocket connection for real-time price updates
-- ✅ Basic trading logic implementation
+- ✅ WebSocket connection for real-time price updates (with auto-reconnect)
+- ✅ Core trading logic implementation (orchestration via service)
 - ✅ Position opening and closing
 - ✅ Stop-loss and take-profit order placement
 - ✅ Trade history recording
 - ✅ Position synchronization at startup
-- ✅ Daily trade limit enforcement
+- ✅ Daily trade limit enforcement (via Risk Manager)
 - ✅ Graceful shutdown handling
+- ✅ Basic Logging System (StdLogger adapter)
+- ✅ Performance Metrics Collection (via Analytics module)
+- ✅ Risk Management Module (`internal/risk`)
 
 ### Trading Features
-- ✅ Fixed position size trading (1 ETH)
-- ✅ Leverage configuration (default: 4x)
-- ✅ Stop-loss orders (0.25% default)
-- ✅ Take-profit orders (1-3% default)
-- ✅ Basic market condition evaluation
+- ✅ Fixed position size trading (default, configurable)
+- ✅ Leverage configuration
+- ✅ Stop-loss orders
+- ✅ Take-profit orders
+- ✅ Strategy-based market condition evaluation (`internal/strategy`)
 - ✅ Position tracking in database
 - ✅ Trade history recording
 - ✅ Balance checking before trades
+- ✅ Technical Indicators (Moving Averages, RSI implemented)
+- ✅ Basic Strategy Implementation (e.g., MA Crossover)
+- ✅ Backtesting Framework (`internal/strategy/backtesting`)
+- ✅ Strategy Optimization Framework (`internal/strategy/optimization`)
 
 ### Technical Implementation
-- ✅ SQLite database integration
-- ✅ Binance Futures API integration
-- ✅ WebSocket handling for price updates
-- ✅ Concurrent operation with mutex protection
-- ✅ Error handling for API calls
+- ✅ SQLite database integration (via Repository pattern)
+- ✅ Binance Futures API integration (via Adapter pattern)
+- ✅ WebSocket handling for price updates (via Adapter pattern)
+- ✅ Concurrent operation with mutex/sync primitives
+- ✅ Basic error handling for API calls
 - ✅ Configuration validation
 - ✅ Docker containerization
+- ✅ Unit Testing (Partial coverage across modules)
+- ✅ Clean Architecture Structure (Ports & Adapters)
 
 ## What's Left to Build
 
 ### Core Functionality
-- ❌ Advanced trading strategy implementation
-- ❌ Dynamic position sizing
-- ❌ Comprehensive logging system
-- ❌ Performance metrics collection
+- ❌ Dynamic position sizing (Risk Manager exists, but dynamic logic TBD)
+- ❌ Advanced/Comprehensive logging system (Current is basic)
 - ❌ Notification system for important events
-- ❌ Circuit breaker for unusual market conditions
-- ✅ Automatic reconnection for WebSocket failures
+- ❌ Circuit breaker for unusual market conditions (Risk Manager exists, but circuit breaker logic TBD)
 
 ### Trading Features
-- ❌ Technical indicators (Moving Averages, RSI, etc.)
 - ❌ Volume analysis for entry/exit decisions
-- ❌ Trend detection algorithm
 - ❌ Multiple timeframe analysis
 - ❌ Dynamic take-profit based on market conditions
 - ❌ Trailing stop-loss implementation
-- ❌ Risk-adjusted position sizing
+- ❌ Risk-adjusted position sizing (related to dynamic sizing)
+- ❌ More advanced strategies beyond MA Crossover
 
 ### Technical Implementation
-- ❌ Unit tests for core components
+- ❌ Comprehensive Unit Test Coverage (Current coverage is partial)
 - ❌ Integration tests with API mocks
 - ❌ Performance optimization for database operations
 - ❌ Memory usage optimization
 - ❌ Configuration hot-reloading
-- ❌ Improved error recovery mechanisms
-- ❌ Comprehensive API error handling
+- ❌ Advanced error recovery mechanisms
+- ❌ Comprehensive API error handling (Current handling is basic)
 
 ## Current Status
 
-### Project Status: Alpha
-The bot is functional but requires further development and testing before production use. Core trading functionality is implemented, but the trading strategy is basic and requires refinement.
+### Project Status: Beta (estimated)
+The bot has core functionality, basic strategies, indicators, risk management, and testing in place. Requires further refinement, testing, and feature completion before production.
 
 ### Development Status
-- **Last Major Update**: Initial implementation of core trading functionality
-- **Current Focus**: Improving trading strategy and error handling
-- **Next Milestone**: Implementing technical indicators for better trade decisions
+- **Last Major Update**: Implementation of strategy framework, indicators, risk manager, analytics, and testing infrastructure.
+- **Current Focus**: Refining existing strategies, improving error handling, potentially adding dynamic sizing.
+- **Next Milestone**: Implementing dynamic position sizing or more advanced strategies.
 
 ### Testing Status
-- **Unit Tests**: Not yet implemented
-- **Integration Tests**: Not yet implemented
-- **Manual Testing**: Basic functionality tested in testnet environment
-- **Known Issues**: See "Known Issues" section below
+- **Unit Tests**: Partially implemented across core modules (Service, Repository, Risk, Strategy, Analytics, Optimizer). Coverage needs improvement.
+- **Integration Tests**: Not yet implemented.
+- **Manual Testing**: Basic functionality tested in testnet environment.
+- **Backtesting**: Framework available for strategy evaluation.
 
 ### Deployment Status
 - **Environment**: Local development only
@@ -98,10 +103,10 @@ The bot is functional but requires further development and testing before produc
    - **Planned Fix**: Implement comprehensive error handling for all API calls
 
 ### Major Issues
-1. **Trading Strategy**: Current implementation is too basic
-   - **Impact**: Suboptimal trading decisions
-   - **Workaround**: Manually adjust configuration parameters
-   - **Planned Fix**: Implement more sophisticated strategy with technical indicators
+1. **Trading Strategy Refinement**: Implemented strategies (e.g., MA Crossover) may need tuning or replacement with more robust ones.
+   - **Impact**: Suboptimal trading decisions.
+   - **Workaround**: Use backtesting/optimization frameworks; configure existing strategies carefully.
+   - **Planned Fix**: Develop and test more advanced strategies.
 
 2. **Position Sizing**: Fixed position size doesn't account for volatility
    - **Impact**: Risk may be too high in volatile conditions
@@ -109,10 +114,10 @@ The bot is functional but requires further development and testing before produc
    - **Planned Fix**: Implement dynamic position sizing based on volatility
 
 ### Minor Issues
-1. **Logging**: Limited logging makes debugging difficult
-   - **Impact**: Harder to diagnose issues
-   - **Workaround**: Add print statements as needed
-   - **Planned Fix**: Implement comprehensive logging system
+1. **Logging Verbosity/Structure**: Basic logging exists, but may lack sufficient detail or structure for complex debugging.
+   - **Impact**: Can be harder to diagnose subtle issues.
+   - **Workaround**: Enhance logging calls in specific areas as needed.
+   - **Planned Fix**: Implement more structured/configurable logging.
 
 2. **Configuration**: No validation for some parameters
    - **Impact**: Invalid configuration may cause unexpected behavior
@@ -122,43 +127,55 @@ The bot is functional but requires further development and testing before produc
 ## Evolution of Project Decisions
 
 ### Trading Strategy Evolution
-1. **Initial Approach**: Simple market order entry with fixed take-profit and stop-loss
-   - **Rationale**: Start with simplest possible implementation
-   - **Outcome**: Functional but not optimal for profitability
+1. **Initial Approach**: Simple market order entry with fixed TP/SL.
+   - **Rationale**: Proof of concept.
+   - **Outcome**: Functional but basic.
 
-2. **Current Approach**: Basic market condition evaluation before entry
-   - **Rationale**: Avoid entering in unfavorable conditions
-   - **Outcome**: Improved but still needs refinement
+2. **Intermediate Approach**: Basic market condition evaluation.
+   - **Rationale**: Avoid obviously bad entries.
+   - **Outcome**: Minor improvement.
 
-3. **Planned Approach**: Technical indicator-based strategy with trend analysis
-   - **Rationale**: More sophisticated analysis should improve results
-   - **Status**: In planning phase
+3. **Current Approach**: Strategy pattern implementation with technical indicators (MA, RSI), specific strategies (MA Crossover), backtesting, and optimization frameworks.
+   - **Rationale**: Enable structured strategy development, testing, and selection.
+   - **Outcome**: Significantly more robust and extensible strategy system.
+
+4. **Planned Approach**: Develop/integrate more advanced strategies, potentially dynamic TP/SL or volume analysis.
+   - **Rationale**: Improve profitability and adaptability.
+   - **Status**: Planning/Development.
 
 ### Risk Management Evolution
-1. **Initial Approach**: Fixed stop-loss at 0.25%
-   - **Rationale**: Minimize losses on each trade
-   - **Outcome**: Effective at limiting individual trade losses
+1. **Initial Approach**: Fixed stop-loss.
+   - **Rationale**: Basic loss limitation.
+   - **Outcome**: Limited individual trade loss.
 
-2. **Current Approach**: Fixed stop-loss with daily trade limit
-   - **Rationale**: Limit overall daily risk exposure
-   - **Outcome**: Better overall risk control
+2. **Intermediate Approach**: Fixed stop-loss + daily trade limit.
+   - **Rationale**: Limit daily exposure.
+   - **Outcome**: Better daily risk control.
 
-3. **Planned Approach**: Dynamic position sizing and volatility-adjusted stops
-   - **Rationale**: Adapt risk to market conditions
-   - **Status**: In planning phase
+3. **Current Approach**: Dedicated Risk Manager module (`internal/risk`) handling daily limits and potentially other checks. Fixed position sizing still default.
+   - **Rationale**: Centralize risk logic.
+   - **Outcome**: Cleaner architecture, foundation for advanced rules.
+
+4. **Planned Approach**: Implement dynamic position sizing (potentially volatility-based or risk-adjusted) within the Risk Manager. Consider circuit breakers.
+   - **Rationale**: Adapt risk dynamically to market conditions and capital.
+   - **Status**: Planning/Development.
 
 ### Technical Architecture Evolution
-1. **Initial Approach**: Monolithic design with all logic in main.go
-   - **Rationale**: Quick implementation for proof of concept
-   - **Outcome**: Functional but difficult to maintain
+1. **Initial Approach**: Monolithic `main.go`.
+   - **Rationale**: Quick PoC.
+   - **Outcome**: Difficult to maintain/test.
 
-2. **Current Approach**: Separated concerns into packages with clearer structure
-   - **Rationale**: Improve maintainability and organization
-   - **Outcome**: Better code organization but still room for improvement
+2. **Intermediate Approach**: Basic package separation (config, database, trading).
+   - **Rationale**: Improve organization.
+   - **Outcome**: Better structure, but tight coupling remained.
 
-3. **Planned Approach**: More modular design with interfaces for testability
-   - **Rationale**: Improve testability and flexibility
-   - **Status**: Partially implemented
+3. **Current Approach**: Clean Architecture / Ports & Adapters (`internal/domain`, `internal/app`, `internal/ports`, `internal/adapters`). Interface-driven design.
+   - **Rationale**: Decoupling, testability, maintainability, adherence to best practices.
+   - **Outcome**: Highly modular, testable, and maintainable codebase.
+
+4. **Planned Approach**: Refine existing adapters/ports as needed, ensure strict adherence to dependency rules.
+   - **Rationale**: Continuous improvement.
+   - **Status**: Ongoing refinement.
 
 ## Milestone History
 
@@ -175,20 +192,27 @@ The bot is functional but requires further development and testing before produc
 - Trade history recording
 - Daily trade limit enforcement
 
-### Milestone 3: Improved Trading Strategy (In Progress)
-- Technical indicators implementation
-- Better market condition evaluation
-- Dynamic position sizing
-- Improved entry/exit timing
+### Milestone 3: Strategy & Analysis Framework (Completed)
+- Technical indicators implementation (MA, RSI)
+- Strategy pattern implementation
+- MA Crossover strategy example
+- Backtesting framework
+- Optimization framework
+- Performance analytics module
 
-### Milestone 4: Robustness Improvements (Planned)
-- Comprehensive error handling
-- WebSocket reconnection logic
-- Circuit breaker implementation
-- Extensive logging
+### Milestone 4: Robustness & Risk Management (Partially Completed / In Progress)
+- ✅ WebSocket reconnection logic (Completed earlier)
+- ✅ Basic Logging System (Completed)
+- ✅ Risk Manager Module (Foundation Completed)
+- ❌ Comprehensive error handling (Ongoing)
+- ❌ Circuit breaker implementation (Planned)
+- ❌ Dynamic Position Sizing (Planned)
 
-### Milestone 5: Performance Optimization (Planned)
-- Database query optimization
-- Memory usage improvements
-- Reduced latency in order execution
-- Performance metrics collection
+### Milestone 5: Testing & Optimization (Partially Completed / In Progress)
+- ✅ Performance metrics collection (Completed via Analytics)
+- ✅ Unit Testing Infrastructure (Completed, coverage ongoing)
+- ❌ Comprehensive Unit Test Coverage (Ongoing)
+- ❌ Integration Testing (Planned)
+- ❌ Database query optimization (Planned)
+- ❌ Memory usage improvements (Planned)
+- ❌ Reduced latency in order execution (Planned)

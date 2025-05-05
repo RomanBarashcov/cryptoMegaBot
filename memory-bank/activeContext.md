@@ -3,87 +3,71 @@
 ## Current Work Focus
 
 ### Primary Focus Areas
-1. **Core Trading Logic Implementation**
-   - Implementing the trading strategy in the `shouldEnterTrade()` method
-   - Fine-tuning position management and risk controls
-   - Optimizing trade entry and exit timing
+1. **Strategy Refinement & Development**
+   - Tuning existing strategies (e.g., MA Crossover) using backtesting/optimization frameworks.
+   - Developing and testing more advanced trading strategies.
+   - Investigating volume analysis and multi-timeframe approaches.
 
-2. **Error Handling and Resilience**
-   - Improving WebSocket reconnection logic
-   - Adding robust error recovery for API failures
-   - Implementing graceful degradation for non-critical failures
+2. **Risk Management Enhancement**
+   - Implementing dynamic position sizing within the Risk Manager.
+   - Considering and potentially implementing circuit breakers for market anomalies.
+   - Refining existing risk controls (stop-loss, daily limits).
 
-3. **Performance Optimization**
-   - Reducing latency in order execution
-   - Optimizing database operations to prevent blocking
-   - Improving memory usage patterns
+3. **Robustness & Testing**
+   - Improving comprehensive API error handling and recovery mechanisms.
+   - Increasing unit test coverage across all modules.
+   - Implementing integration tests with API mocks.
+   - Enhancing the logging system for better diagnostics.
 
-### In-Progress Tasks
-- Implementing more sophisticated market analysis in the trading strategy
-- Adding comprehensive logging for better debugging and monitoring
-- Creating additional database indexes for performance optimization
-- Implementing a more robust position sizing algorithm
+### In-Progress Tasks (Likely)
+- Implementing dynamic position sizing algorithm within the Risk Manager.
+- Enhancing API error handling routines.
+- Increasing unit test coverage for specific modules.
+- Developing/testing new trading strategies.
+- Refining the basic logging system towards a more comprehensive solution.
 
 ## Recent Changes
 
-### Code Changes
-1. Implemented robust WebSocket reconnection with exponential backoff
-2. Added position synchronization at startup to handle bot restarts
-3. Implemented daily trade limit enforcement
-4. Added proper error handling for Binance API calls
-5. Improved database schema with additional indexes
-6. Added configuration validation at startup
+### Code Changes (Recent Major Updates)
+1. Implemented Strategy framework (`internal/strategy`) including indicators (MA, RSI), backtesting, optimization, and analytics.
+2. Implemented MA Crossover strategy example.
+3. Implemented dedicated Risk Manager module (`internal/risk`).
+4. Implemented basic Logging adapter (`internal/adapters/logger`).
+5. Established partial Unit Test coverage across core modules.
+6. Implemented robust WebSocket reconnection with exponential backoff.
+7. Added position synchronization at startup.
+8. Refined configuration validation.
 
 ### Architecture Changes
-1. Refactored trading logic into separate methods for better organization
-2. Implemented mutex protection for shared state
-3. Added graceful shutdown handling
-4. Improved error propagation throughout the system
+1. Migrated to Clean Architecture / Ports & Adapters structure (`internal/domain`, `internal/app`, `internal/ports`, `internal/adapters`).
+2. Implemented interface-driven design for decoupling and testability.
+3. Centralized core application logic in `internal/app/service.go`.
+4. Introduced dedicated adapters for external dependencies (Binance client, SQLite repository, Logger).
+5. Established clear boundaries between application layers.
+6. Implemented mutex/sync primitives for concurrency control where needed.
+7. Added graceful shutdown handling.
 
 ### Configuration Changes
-1. Added testnet support for development and testing
-2. Implemented minimum available balance check
-3. Added configurable leverage setting
-4. Added development mode flag
+1. Added testnet support.
+2. Added configurable leverage setting.
+3. Added development mode flag.
+4. Refined configuration loading and validation (`config/config.go`).
 
 ## Next Steps
 
-### Short-term Goals
-1. **Improve Error Handling**
-   - Implement comprehensive error handling for API calls
-   - Add recovery mechanisms for critical failures
-   - Improve error logging with context information
-
-2. **Improve Trading Strategy**
-   - Implement technical indicators (Moving Averages, RSI)
-   - Add volume analysis for entry/exit decisions
-   - Implement trend detection algorithm
-
-3. **Enhance Monitoring**
-   - Add detailed performance metrics
-   - Implement periodic status reporting
-   - Create better visualization of trading history
-
-4. **Increase Test Coverage**
-   - Add unit tests for core components
-   - Implement integration tests with API mocks
-   - Create test fixtures for database operations
+### Short-term Goals (Reflecting Current Focus)
+1. **Implement Dynamic Position Sizing**: Integrate logic into the Risk Manager.
+2. **Enhance Error Handling**: Move from basic to comprehensive API error handling and recovery.
+3. **Increase Test Coverage**: Focus on achieving higher unit test coverage and implementing integration tests.
+4. **Refine Logging**: Improve structure and detail of the logging system.
+5. **Develop Advanced Strategy**: Implement a strategy beyond MA Crossover (e.g., incorporating volume or other indicators).
 
 ### Medium-term Goals
-1. **Add Notification System**
-   - Implement email alerts for critical events
-   - Add Telegram bot integration for status updates
-   - Create daily performance reports
-
-2. **Improve Risk Management**
-   - Implement dynamic position sizing based on volatility
-   - Add circuit breaker for unusual market conditions
-   - Create drawdown limits to pause trading
-
-3. **Enhance Configuration**
-   - Add support for configuration profiles
-   - Implement hot-reloading of configuration
-   - Create configuration validation tool
+1. **Notification System**: Implement alerts (Email, Telegram) for critical events and status updates.
+2. **Advanced Risk Features**: Implement circuit breakers, potentially drawdown limits within Risk Manager.
+3. **Performance Optimization**: Profile and optimize database operations, memory usage, and execution latency.
+4. **Configuration Enhancements**: Consider configuration profiles or hot-reloading if needed.
+5. **Explore Further Indicators/Strategies**: Investigate more complex market analysis techniques.
 
 ## Active Decisions and Considerations
 
@@ -99,28 +83,31 @@
    - Implementation: Added robust reconnection handling with exponential backoff
 
 3. **Fixed vs. Dynamic Position Sizing**
-   - Decision: Currently using fixed position sizing (1 ETH)
-   - Consideration: Evaluating dynamic sizing based on account balance and volatility
-   - Next step: Implement and test dynamic sizing algorithm
+   - Decision: Currently using fixed position sizing (default). Risk Manager module exists.
+   - Consideration: Dynamic sizing (e.g., volatility-based, risk-adjusted) is a high-priority next step.
+   - Next step: Implement and test dynamic sizing algorithm within the Risk Manager.
 
 ### Open Questions
-1. How to handle extended market downtime or API outages?
-2. What additional metrics should be tracked for performance evaluation?
-3. How to optimize the balance between trade frequency and profit per trade?
-4. Should we implement a machine learning component for strategy optimization?
+1. How to best implement comprehensive error handling and recovery for extended API outages?
+2. What specific metrics (beyond basic PnL) in the Analytics module are most crucial for strategy evaluation? (Covered partially by `internal/strategy/analytics`)
+3. How to effectively use the optimization framework (`internal/strategy/optimization`) to balance trade frequency vs. profit?
+4. Is the current strategy framework sufficient, or is exploring ML components warranted later?
+5. What is the optimal approach for integration testing with mocked external APIs (Binance)?
 
 ## Important Patterns and Preferences
 
 ### Code Organization
-- Separate concerns into distinct packages (config, database, trading)
-- Use interfaces for testability and flexibility
-- Keep main.go focused on initialization and coordination
+- Adheres to Clean Architecture / Ports & Adapters pattern.
+- Clear separation via `internal/domain`, `internal/app`, `internal/ports`, `internal/adapters`.
+- Heavy use of interfaces (`internal/ports`) for dependency inversion and testability.
+- `cmd/` contains application entry points; `main.go` orchestrates setup and dependency injection.
 
 ### Error Handling
-- Propagate errors with context
-- Log errors at the point of handling
-- Use custom error types for specific error conditions
-- Recover from panics in critical goroutines
+- Propagate errors using `fmt.Errorf("context: %w", err)` pattern.
+- Basic logging of errors at handling points (needs enhancement).
+- Custom error types defined in `internal/ports/errors.go`.
+- Panic recovery considered for critical goroutines.
+- Comprehensive handling/recovery is an area for improvement.
 
 ### Configuration Management
 - Use environment variables for all configurable parameters
@@ -129,10 +116,11 @@
 - Document all configuration options
 
 ### Database Operations
-- Use prepared statements for all queries
-- Implement proper error handling for database operations
-- Use transactions for related operations
-- Keep database schema in version-controlled SQL files
+- Abstracted via Repository pattern (`internal/ports/repository.go`, `internal/adapters/sqlite/repository.go`).
+- Use prepared statements where applicable via `database/sql`.
+- Basic error handling implemented in adapter.
+- Transactions used for related operations.
+- Schema managed via `init.sql`.
 
 ## Learnings and Project Insights
 

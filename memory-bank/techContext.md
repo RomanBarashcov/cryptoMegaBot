@@ -60,19 +60,39 @@
 ### Directory Structure
 ```
 cryptoMegaBot/
+├── cmd/                  # Application entry points (e.g., main bot, test runners)
+│   └── ...
 ├── config/
 │   └── config.go         # Configuration loading and validation
-├── database/
-│   └── db.go             # Database operations and models
 ├── data/
-│   └── trading_bot.db    # SQLite database file
-├── .env                  # Environment configuration (not in repo)
+│   └── trading_bot.db    # SQLite database file (if used locally)
+├── internal/             # Internal application logic (not importable by others)
+│   ├── adapters/         # Adapters for external dependencies (Ports implementation)
+│   │   ├── binanceclient/ # Binance API client adapter
+│   │   ├── logger/        # Logging adapter (e.g., StdLogger)
+│   │   └── sqlite/        # SQLite repository adapter
+│   ├── app/              # Application core service/use cases
+│   │   └── service.go
+│   ├── domain/           # Core domain models (Position, Trade, Kline, etc.)
+│   ├── ports/            # Interfaces defining application ports (Repository, Exchange, Strategy, etc.)
+│   ├── risk/             # Risk management logic
+│   │   └── manager.go
+│   └── strategy/         # Trading strategy components
+│       ├── analytics/     # Performance calculation
+│       ├── backtesting/   # Backtesting engine
+│       ├── indicators/    # Technical indicators (MA, RSI, etc.)
+│       ├── optimization/  # Strategy parameter optimization
+│       └── strategies/    # Specific strategy implementations (e.g., MA Crossover)
+├── memory-bank/          # Project context documentation (this folder)
+│   └── ...
+├── .env                  # Environment configuration (local, not in repo)
 ├── .env.example          # Example environment configuration
+├── .gitignore            # Git ignore rules
 ├── docker-compose.yml    # Docker Compose configuration
 ├── go.mod                # Go module definition
 ├── go.sum                # Go module checksums
 ├── init.sql              # Database initialization script
-├── main.go               # Application entry point
+├── Makefile              # Build/test automation commands
 └── README.md             # Project documentation
 ```
 
