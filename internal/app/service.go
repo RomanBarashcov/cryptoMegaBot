@@ -14,7 +14,6 @@ import (
 	"cryptoMegaBot/config"
 	"cryptoMegaBot/internal/domain"
 	"cryptoMegaBot/internal/ports"
-	"cryptoMegaBot/internal/strategy"
 )
 
 const (
@@ -28,7 +27,7 @@ type TradingService struct {
 	exchange   ports.ExchangeClient
 	posRepo    ports.PositionRepository
 	tradeRepo  ports.TradeRepository
-	strategy   *strategy.Strategy
+	strategy   ports.Strategy
 	klineCache []*domain.Kline // Simple cache for strategy calculations
 
 	// State fields
@@ -44,7 +43,7 @@ func NewTradingService(
 	exchange ports.ExchangeClient,
 	posRepo ports.PositionRepository,
 	tradeRepo ports.TradeRepository,
-	strat *strategy.Strategy,
+	strat ports.Strategy,
 ) (*TradingService, error) {
 
 	// Validate dependencies
@@ -119,6 +118,7 @@ func (s *TradingService) Start(ctx context.Context) error {
 		// Log error but continue, assuming no open position if DB fails? Or make it fatal?
 		// Let's make it fatal for now, as state is critical.
 		s.logger.Error(ctx, err, "Failed to check for existing open position")
+		s.logger.Info(ctx, "No existing open position found")
 		return fmt.Errorf("failed to query open position: %w", err)
 	}
 	if openPos != nil {

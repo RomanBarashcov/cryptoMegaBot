@@ -9,6 +9,7 @@ import (
 	"cryptoMegaBot/internal/adapters/logger"
 	"cryptoMegaBot/internal/adapters/sqlite"
 	"cryptoMegaBot/internal/app"
+	"cryptoMegaBot/internal/ports"
 	"cryptoMegaBot/internal/strategy"
 )
 
@@ -55,7 +56,8 @@ func main() {
 	appLogger.Info(context.Background(), "Binance client initialized")
 
 	// 5. Initialize Strategy
-	strat, err := strategy.New(strategy.Config{
+	var strat ports.Strategy
+	strat, err = strategy.New(strategy.Config{
 		ShortTermMAPeriod: cfg.StrategyShortMAPeriod,
 		LongTermMAPeriod:  cfg.StrategyLongMAPeriod,
 		EMAPeriod:         cfg.StrategyEMAPeriod,
