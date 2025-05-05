@@ -82,3 +82,4 @@ go.sum
 # Docker
 .docker/
 docker-compose.override.yml 
+.env
