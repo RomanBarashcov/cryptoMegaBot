@@ -102,16 +102,48 @@ func (s *TradingService) Start(ctx context.Context) error {
 	}
 	s.logger.Info(ctx, "Server time synchronized")
 
-	// 2. Set Leverage
-	if err := s.exchange.SetLeverage(ctx, s.cfg.Symbol, s.cfg.Leverage); err != nil {
-		// Log error but potentially continue? Depends on requirements.
-		s.logger.Error(ctx, err, "Failed to set leverage", map[string]interface{}{"symbol": s.cfg.Symbol, "leverage": s.cfg.Leverage})
-		// return fmt.Errorf("failed to set leverage: %w", err) // Make it fatal?
-	} else {
-		s.logger.Info(ctx, "Leverage set successfully", map[string]interface{}{"symbol": s.cfg.Symbol, "leverage": s.cfg.Leverage})
+	// 2. Check if futures trading is enabled
+	pos, err := s.exchange.GetPositionRisk(ctx, s.cfg.Symbol)
+	if err != nil {
+		s.logger.Error(ctx, err, "Failed to check futures trading status", map[string]interface{}{"symbol": s.cfg.Symbol})
+		return fmt.Errorf("failed to check futures trading status: %w", err)
 	}
 
-	// 3. Sync existing position state (if any)
+	// 3. Set Leverage only if current leverage is different
+	currentLeverage := 1 // Default leverage
+	if pos != nil {
+		currentLeverage = pos.Leverage
+	}
+
+	if currentLeverage != s.cfg.Leverage {
+		// Try to set leverage
+		if err := s.exchange.SetLeverage(ctx, s.cfg.Symbol, s.cfg.Leverage); err != nil {
+			s.logger.Error(ctx, err, "Failed to set leverage", map[string]interface{}{
+				"symbol":          s.cfg.Symbol,
+				"currentLeverage": currentLeverage,
+				"targetLeverage":  s.cfg.Leverage,
+			})
+			// Continue with current leverage instead of failing
+			s.logger.Warn(ctx, "Continuing with current leverage", map[string]interface{}{
+				"symbol":   s.cfg.Symbol,
+				"leverage": currentLeverage,
+			})
+			// Update config to use current leverage
+			s.cfg.Leverage = currentLeverage
+		} else {
+			s.logger.Info(ctx, "Leverage set successfully", map[string]interface{}{
+				"symbol":   s.cfg.Symbol,
+				"leverage": s.cfg.Leverage,
+			})
+		}
+	} else {
+		s.logger.Info(ctx, "Leverage already set correctly", map[string]interface{}{
+			"symbol":   s.cfg.Symbol,
+			"leverage": currentLeverage,
+		})
+	}
+
+	// 4. Sync existing position state (if any)
 	s.logger.Info(ctx, "Synchronizing initial state...")
 	openPos, err := s.posRepo.FindOpenBySymbol(ctx, s.cfg.Symbol)
 	if err != nil {
@@ -140,7 +172,7 @@ func (s *TradingService) Start(ctx context.Context) error {
 	s.tradesToday = tradesCount
 	s.logger.Info(ctx, "Initial state synchronized", map[string]interface{}{"tradesToday": s.tradesToday})
 
-	// 4. Load initial klines for strategy
+	// 5. Load initial klines for strategy
 	requiredPoints := s.strategy.RequiredDataPoints()
 	s.logger.Info(ctx, "Loading initial klines for strategy", map[string]interface{}{"requiredPoints": requiredPoints})
 	initialKlines, err := s.exchange.GetKlines(ctx, s.cfg.Symbol, "1m", requiredPoints)
@@ -526,18 +558,13 @@ func (s *TradingService) closePosition(ctx context.Context, exitPrice float64, r
 	// 6. Save updated position via posRepo.Update
 	err = s.posRepo.Update(ctx, positionToClose)
 	if err != nil {
-		// Log error, but proceed with state update as the position is closed on the exchange.
-		// DB inconsistency might need manual correction later.
+		// Log error and return it since this is a critical operation
 		s.logger.Error(ctx, err, op+": Failed to update closed position in repository", map[string]interface{}{"positionID": positionToClose.ID})
-		// Consider adding alerting here.
-	} else {
-		s.logger.Info(ctx, op+": Closed position updated in DB", map[string]interface{}{"positionID": positionToClose.ID})
+		return fmt.Errorf("failed to update closed position in repository: %w", err)
 	}
+	s.logger.Info(ctx, op+": Closed position updated in DB", map[string]interface{}{"positionID": positionToClose.ID})
 
-	// 7. Create domain.Trade object - REMOVED (Trade info is now part of the closed Position)
-	// 8. Save trade via tradeRepo.CreateTrade - REMOVED
-
-	// 9. Update internal state (Renumbered to 7)
+	// 7. Update internal state
 	s.currentPosition = nil
 	s.logger.Info(ctx, op+": Position closed successfully, internal state updated", map[string]interface{}{"positionID": positionToClose.ID})
 

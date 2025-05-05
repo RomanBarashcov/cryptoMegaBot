@@ -73,6 +73,8 @@ type mockExchange struct {
 	positionRisk    *ports.PositionRisk
 	positionRiskErr error
 	serverTime      time.Time
+	balance         float64
+	balanceErr      error
 }
 
 func (m *mockExchange) GetServerTime(ctx context.Context) (time.Time, error) {
@@ -92,7 +94,7 @@ func (m *mockExchange) GetTickerPrice(ctx context.Context, symbol string) (float
 }
 
 func (m *mockExchange) GetAccountBalance(ctx context.Context, asset string) (float64, error) {
-	return 1000.0, nil // Default test balance
+	return m.balance, m.balanceErr
 }
 
 func (m *mockExchange) SetLeverage(ctx context.Context, symbol string, leverage int) error {
@@ -115,7 +117,10 @@ func (m *mockExchange) PlaceTakeProfitMarketOrder(ctx context.Context, symbol st
 }
 
 func (m *mockExchange) GetPositionRisk(ctx context.Context, symbol string) (*ports.PositionRisk, error) {
-	return m.positionRisk, m.positionRiskErr
+	if m.positionRiskErr != nil {
+		return nil, m.positionRiskErr
+	}
+	return m.positionRisk, nil
 }
 
 func (m *mockExchange) CancelOrder(ctx context.Context, symbol string, orderID int64) (*ports.OrderResponse, error) {
@@ -469,6 +474,51 @@ func TestTradingService_handleKlineEvent(t *testing.T) {
 			},
 			wantPosition: false,
 		},
+		{
+			name: "final kline - insufficient balance",
+			kline: &domain.Kline{
+				Symbol:    "ETHUSDT",
+				Interval:  "1m",
+				OpenTime:  time.Now(),
+				CloseTime: time.Now().Add(time.Minute),
+				Open:      2000.0,
+				High:      2010.0,
+				Low:       1990.0,
+				Close:     2005.0,
+				Volume:    100.0,
+				IsFinal:   true,
+			},
+			mockSetup: func(e *mockExchange, p *mockPositionRepo, t *mockTradeRepo, s *strategy.Strategy) {
+				e.balance = 0.1 // Set very low balance
+				e.balanceErr = nil
+			},
+			checkState: func(t *testing.T, s *TradingService) {
+				assert.Nil(t, s.currentPosition)
+			},
+			wantPosition: false,
+		},
+		{
+			name: "final kline - error getting balance",
+			kline: &domain.Kline{
+				Symbol:    "ETHUSDT",
+				Interval:  "1m",
+				OpenTime:  time.Now(),
+				CloseTime: time.Now().Add(time.Minute),
+				Open:      2000.0,
+				High:      2010.0,
+				Low:       1990.0,
+				Close:     2005.0,
+				Volume:    100.0,
+				IsFinal:   true,
+			},
+			mockSetup: func(e *mockExchange, p *mockPositionRepo, t *mockTradeRepo, s *strategy.Strategy) {
+				e.balanceErr = assert.AnError
+			},
+			checkState: func(t *testing.T, s *TradingService) {
+				assert.Nil(t, s.currentPosition)
+			},
+			wantPosition: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -574,17 +624,20 @@ func TestTradingService_canTrade(t *testing.T) {
 
 func TestTradingService_Start(t *testing.T) {
 	tests := []struct {
-		name           string
-		serverTimeErr  error
-		leverageErr    error
-		findOpenErr    error
-		countTodayErr  error
-		klinesErr      error
-		klines         []*domain.Kline
-		openPosition   *domain.Position
-		todayCount     int
-		expectedError  bool
-		expectedErrMsg string
+		name            string
+		serverTimeErr   error
+		leverageErr     error
+		findOpenErr     error
+		countTodayErr   error
+		klinesErr       error
+		klines          []*domain.Kline
+		openPosition    *domain.Position
+		todayCount      int
+		expectedError   bool
+		expectedErrMsg  string
+		positionRisk    *ports.PositionRisk
+		positionRiskErr error
+		serverTime      time.Time
 	}{
 		{
 			name:          "successful start with no open position",
@@ -607,14 +660,17 @@ func TestTradingService_Start(t *testing.T) {
 		{
 			name:           "count today trades failure",
 			countTodayErr:  assert.AnError,
+			klines:         generateTestKlines(100),
 			expectedError:  true,
 			expectedErrMsg: "failed to count today's trades",
+			serverTime:     time.Now(),
 		},
 		{
 			name:           "insufficient klines data",
-			klines:         generateTestKlines(10), // Not enough klines
+			klines:         []*domain.Kline{},
 			expectedError:  true,
 			expectedErrMsg: "not enough initial klines loaded",
+			serverTime:     time.Now(),
 		},
 		{
 			name:   "successful start with existing position",
@@ -628,18 +684,45 @@ func TestTradingService_Start(t *testing.T) {
 			todayCount:    1,
 			expectedError: false,
 		},
+		{
+			name:            "position risk check failure",
+			positionRiskErr: assert.AnError,
+			klines:          generateTestKlines(100),
+			expectedError:   true,
+			expectedErrMsg:  "failed to check futures trading status",
+			openPosition:    nil,
+			serverTime:      time.Now(),
+		},
+		{
+			name:   "successful start with existing position and leverage",
+			klines: generateTestKlines(100),
+			openPosition: &domain.Position{
+				ID:         1,
+				Symbol:     "ETHUSDT",
+				EntryPrice: 2000.0,
+				Status:     domain.StatusOpen,
+			},
+			positionRisk: &ports.PositionRisk{
+				Leverage: 5,
+			},
+			todayCount:    1,
+			expectedError: false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create mocks
 			logger := &mockLogger{}
 			exchange := &mockExchange{
-				serverTimeErr: tt.serverTimeErr,
-				leverageErr:   tt.leverageErr,
-				klines:        tt.klines,
-				klinesErr:     tt.klinesErr,
-				serverTime:    time.Now(),
+				serverTime:      tt.serverTime,
+				serverTimeErr:   tt.serverTimeErr,
+				leverageErr:     tt.leverageErr,
+				klines:          tt.klines,
+				klinesErr:       tt.klinesErr,
+				positionRisk:    tt.positionRisk,
+				positionRiskErr: tt.positionRiskErr,
+				orderResponses:  make(map[string]*ports.OrderResponse),
+				orderErrors:     make(map[string]error),
 			}
 			posRepo := &mockPositionRepo{
 				positions:   make(map[string]*domain.Position),
@@ -652,17 +735,7 @@ func TestTradingService_Start(t *testing.T) {
 				todayCount:    tt.todayCount,
 				todayCountErr: tt.countTodayErr,
 			}
-
-			// Create a real strategy instance for testing
-			strat, err := strategy.New(strategy.Config{
-				ShortTermMAPeriod: 20,
-				LongTermMAPeriod:  50,
-				EMAPeriod:         20,
-				RSIPeriod:         14,
-				RSIOverbought:     70.0,
-				RSIOversold:       30.0,
-			}, logger)
-			require.NoError(t, err)
+			strat := &mockStrategy{}
 
 			// Create service
 			cfg := &config.Config{
@@ -708,7 +781,7 @@ func TestTradingService_Start(t *testing.T) {
 				assert.Contains(t, logger.errorMsgs, "Failed to synchronize server time")
 			} else if tt.openPosition != nil {
 				assert.Contains(t, logger.infoMsgs, "Found existing open position")
-			} else {
+			} else if tt.positionRiskErr == nil {
 				assert.Contains(t, logger.infoMsgs, "No existing open position found")
 			}
 		})
@@ -736,4 +809,333 @@ func generateTestKlines(count int) []*domain.Kline {
 		}
 	}
 	return klines
+}
+
+func TestTradingService_enterPosition(t *testing.T) {
+	cfg := &config.Config{
+		Symbol:    "ETHUSDT",
+		Quantity:  0.1,
+		StopLoss:  0.02,
+		MaxProfit: 0.05,
+		MaxOrders: 5,
+		Leverage:  10,
+	}
+
+	tests := []struct {
+		name           string
+		entryPrice     float64
+		mockSetup      func(*mockExchange, *mockPositionRepo)
+		expectedError  bool
+		expectedErrMsg string
+	}{
+		{
+			name:       "successful position entry",
+			entryPrice: 2000.0,
+			mockSetup: func(e *mockExchange, p *mockPositionRepo) {
+				e.orderResponses = map[string]*ports.OrderResponse{
+					"market_BUY": {
+						OrderID:      1,
+						Symbol:       "ETHUSDT",
+						OrigQuantity: 0.1,
+						ExecutedQty:  0.1,
+						AvgPrice:     2000.0,
+						Status:       "FILLED",
+						Type:         "MARKET",
+						Side:         string(domain.Buy),
+						Timestamp:    time.Now(),
+					},
+					"stop_SELL": {
+						OrderID:      2,
+						Symbol:       "ETHUSDT",
+						OrigQuantity: 0.1,
+						ExecutedQty:  0.0,
+						Price:        1960.0,
+						Status:       "NEW",
+						Type:         "STOP_MARKET",
+						Side:         string(domain.Sell),
+						Timestamp:    time.Now(),
+					},
+					"tp_SELL": {
+						OrderID:      3,
+						Symbol:       "ETHUSDT",
+						OrigQuantity: 0.1,
+						ExecutedQty:  0.0,
+						Price:        2100.0,
+						Status:       "NEW",
+						Type:         "TAKE_PROFIT_MARKET",
+						Side:         string(domain.Sell),
+						Timestamp:    time.Now(),
+					},
+				}
+				e.orderErrors = make(map[string]error)
+			},
+			expectedError: false,
+		},
+		{
+			name:       "entry order failure",
+			entryPrice: 2000.0,
+			mockSetup: func(e *mockExchange, p *mockPositionRepo) {
+				e.orderErrors = map[string]error{
+					"market_BUY": assert.AnError,
+				}
+			},
+			expectedError:  true,
+			expectedErrMsg: "entry market order failed",
+		},
+		{
+			name:       "stop loss order failure",
+			entryPrice: 2000.0,
+			mockSetup: func(e *mockExchange, p *mockPositionRepo) {
+				e.orderResponses = map[string]*ports.OrderResponse{
+					"market_BUY": {
+						OrderID:      1,
+						Symbol:       "ETHUSDT",
+						OrigQuantity: 0.1,
+						ExecutedQty:  0.1,
+						AvgPrice:     2000.0,
+						Status:       "FILLED",
+						Type:         "MARKET",
+						Side:         string(domain.Buy),
+						Timestamp:    time.Now(),
+					},
+				}
+				e.orderErrors = map[string]error{
+					"stop_SELL": assert.AnError,
+				}
+			},
+			expectedError:  true,
+			expectedErrMsg: "stop loss order failed after entry",
+		},
+		{
+			name:       "take profit order failure",
+			entryPrice: 2000.0,
+			mockSetup: func(e *mockExchange, p *mockPositionRepo) {
+				e.orderResponses = map[string]*ports.OrderResponse{
+					"market_BUY": {
+						OrderID:      1,
+						Symbol:       "ETHUSDT",
+						OrigQuantity: 0.1,
+						ExecutedQty:  0.1,
+						AvgPrice:     2000.0,
+						Status:       "FILLED",
+						Type:         "MARKET",
+						Side:         string(domain.Buy),
+						Timestamp:    time.Now(),
+					},
+					"stop_SELL": {
+						OrderID:      2,
+						Symbol:       "ETHUSDT",
+						OrigQuantity: 0.1,
+						ExecutedQty:  0.0,
+						Price:        1960.0,
+						Status:       "NEW",
+						Type:         "STOP_MARKET",
+						Side:         string(domain.Sell),
+						Timestamp:    time.Now(),
+					},
+				}
+				e.orderErrors = map[string]error{
+					"tp_SELL": assert.AnError,
+				}
+			},
+			expectedError:  true,
+			expectedErrMsg: "take profit order failed after entry",
+		},
+		{
+			name:       "position save failure",
+			entryPrice: 2000.0,
+			mockSetup: func(e *mockExchange, p *mockPositionRepo) {
+				e.orderResponses = map[string]*ports.OrderResponse{
+					"market_BUY": {
+						OrderID:      1,
+						Symbol:       "ETHUSDT",
+						OrigQuantity: 0.1,
+						ExecutedQty:  0.1,
+						AvgPrice:     2000.0,
+						Status:       "FILLED",
+						Type:         "MARKET",
+						Side:         string(domain.Buy),
+						Timestamp:    time.Now(),
+					},
+					"stop_SELL": {
+						OrderID:      2,
+						Symbol:       "ETHUSDT",
+						OrigQuantity: 0.1,
+						ExecutedQty:  0.0,
+						Price:        1960.0,
+						Status:       "NEW",
+						Type:         "STOP_MARKET",
+						Side:         string(domain.Sell),
+						Timestamp:    time.Now(),
+					},
+					"tp_SELL": {
+						OrderID:      3,
+						Symbol:       "ETHUSDT",
+						OrigQuantity: 0.1,
+						ExecutedQty:  0.0,
+						Price:        2100.0,
+						Status:       "NEW",
+						Type:         "TAKE_PROFIT_MARKET",
+						Side:         string(domain.Sell),
+						Timestamp:    time.Now(),
+					},
+				}
+				e.orderErrors = make(map[string]error)
+				p.createErr = assert.AnError
+			},
+			expectedError:  true,
+			expectedErrMsg: "failed to save position to DB after placing orders",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger := &mockLogger{}
+			exchange := &mockExchange{}
+			posRepo := &mockPositionRepo{positions: make(map[string]*domain.Position)}
+			tradeRepo := &mockTradeRepo{}
+			strategy := &mockStrategy{shouldEnter: true}
+
+			service, err := NewTradingService(cfg, logger, exchange, posRepo, tradeRepo, strategy)
+			require.NoError(t, err)
+
+			if tt.mockSetup != nil {
+				tt.mockSetup(exchange, posRepo)
+			}
+
+			err = service.enterPosition(context.Background(), tt.entryPrice)
+			if tt.expectedError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErrMsg)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, service.currentPosition)
+				assert.Equal(t, domain.StatusOpen, service.currentPosition.Status)
+			}
+		})
+	}
+}
+
+func TestTradingService_closePosition(t *testing.T) {
+	cfg := &config.Config{
+		Symbol:    "ETHUSDT",
+		Quantity:  0.1,
+		StopLoss:  0.02,
+		MaxProfit: 0.05,
+		MaxOrders: 5,
+		Leverage:  10,
+	}
+
+	tests := []struct {
+		name           string
+		exitPrice      float64
+		closeReason    domain.CloseReason
+		mockSetup      func(*mockExchange, *mockPositionRepo)
+		expectedError  bool
+		expectedErrMsg string
+	}{
+		{
+			name:        "successful position close",
+			exitPrice:   2100.0,
+			closeReason: domain.CloseReasonTakeProfit,
+			mockSetup: func(e *mockExchange, p *mockPositionRepo) {
+				e.orderResponses = map[string]*ports.OrderResponse{
+					"market_SELL": {
+						OrderID:      1,
+						Symbol:       "ETHUSDT",
+						OrigQuantity: 0.1,
+						ExecutedQty:  0.1,
+						AvgPrice:     2100.0,
+						Status:       "FILLED",
+						Type:         "MARKET",
+						Side:         string(domain.Sell),
+						Timestamp:    time.Now(),
+					},
+				}
+				e.orderErrors = make(map[string]error)
+			},
+			expectedError: false,
+		},
+		{
+			name:        "close order failure",
+			exitPrice:   2100.0,
+			closeReason: domain.CloseReasonTakeProfit,
+			mockSetup: func(e *mockExchange, p *mockPositionRepo) {
+				e.orderErrors = map[string]error{
+					"market_SELL": assert.AnError,
+				}
+			},
+			expectedError:  true,
+			expectedErrMsg: "failed to place closing market order",
+		},
+		{
+			name:        "position update failure",
+			exitPrice:   2100.0,
+			closeReason: domain.CloseReasonTakeProfit,
+			mockSetup: func(e *mockExchange, p *mockPositionRepo) {
+				e.orderResponses = map[string]*ports.OrderResponse{
+					"market_SELL": {
+						OrderID:      1,
+						Symbol:       "ETHUSDT",
+						OrigQuantity: 0.1,
+						ExecutedQty:  0.1,
+						AvgPrice:     2100.0,
+						Status:       "FILLED",
+						Type:         "MARKET",
+						Side:         string(domain.Sell),
+						Timestamp:    time.Now(),
+					},
+				}
+				e.orderErrors = make(map[string]error)
+				p.updateErr = assert.AnError
+			},
+			expectedError:  true,
+			expectedErrMsg: "failed to update closed position in repository",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger := &mockLogger{}
+			exchange := &mockExchange{
+				orderResponses: make(map[string]*ports.OrderResponse),
+				orderErrors:    make(map[string]error),
+			}
+			posRepo := &mockPositionRepo{
+				positions: make(map[string]*domain.Position),
+			}
+			tradeRepo := &mockTradeRepo{}
+			strategy := &mockStrategy{shouldClose: true}
+
+			service, err := NewTradingService(cfg, logger, exchange, posRepo, tradeRepo, strategy)
+			require.NoError(t, err)
+
+			// Set up initial position
+			pos := &domain.Position{
+				ID:                1,
+				Symbol:            "ETHUSDT",
+				EntryPrice:        2000.0,
+				Quantity:          0.1,
+				Status:            domain.StatusOpen,
+				StopLossOrderID:   ptrToString("2"),
+				TakeProfitOrderID: ptrToString("3"),
+			}
+			service.currentPosition = pos
+			posRepo.positions["ETHUSDT"] = pos
+
+			if tt.mockSetup != nil {
+				tt.mockSetup(exchange, posRepo)
+			}
+
+			err = service.closePosition(context.Background(), tt.exitPrice, tt.closeReason)
+			if tt.expectedError {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErrMsg)
+				assert.NotNil(t, service.currentPosition) // Position should not be nil on error
+			} else {
+				assert.NoError(t, err)
+				assert.Nil(t, service.currentPosition)
+			}
+		})
+	}
 }
