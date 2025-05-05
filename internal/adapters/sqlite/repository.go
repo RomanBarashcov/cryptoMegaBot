@@ -387,10 +387,11 @@ func scanPosition(s scanner) (*domain.Position, error) {
 	var slOrderID sql.NullString
 	var tpOrderID sql.NullString
 	var closeReason sql.NullString
+	var exitPrice sql.NullFloat64 // Add NullFloat64 for exit_price
 
 	// Ensure the Scan call matches the SELECT query columns exactly
 	err := s.Scan(
-		&p.ID, &p.Symbol, &p.EntryPrice, &p.ExitPrice, &p.Quantity, &p.Leverage,
+		&p.ID, &p.Symbol, &p.EntryPrice, &exitPrice, &p.Quantity, &p.Leverage,
 		&p.StopLoss, &p.TakeProfit, &p.EntryTime, &exitTime, &status, &pnl,
 		&slOrderID, &tpOrderID, &closeReason, // Scan new columns
 	)
@@ -400,6 +401,9 @@ func scanPosition(s scanner) (*domain.Position, error) {
 
 	if exitTime.Valid {
 		p.ExitTime = exitTime.Time
+	}
+	if exitPrice.Valid {
+		p.ExitPrice = exitPrice.Float64
 	}
 	if pnl.Valid {
 		p.PNL = pnl.Float64 // Assign if not NULL

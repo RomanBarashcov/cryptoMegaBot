@@ -4,7 +4,6 @@ go 1.23
 
 require (
 	github.com/adshao/go-binance/v2 v2.8.2
-	github.com/binance/binance-connector-go v0.8.0
 	github.com/joho/godotenv v1.5.1
 	github.com/mattn/go-sqlite3 v1.14.22
 )
