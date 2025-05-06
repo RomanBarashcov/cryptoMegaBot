@@ -155,7 +155,7 @@ func (s *TradingService) Start(ctx context.Context) error {
 	}
 	if openPos != nil {
 		s.currentPosition = openPos
-		s.logger.Info(ctx, "Found existing open position", map[string]interface{}{"positionID": openPos.ID, "entryPrice": openPos.EntryPrice})
+		s.logger.Info(ctx, "Found existing open position", map[string]interface{}{"positionID": openPos.ID, "entryPrice": openPos.EntryPrice, "takeProfit": openPos.TakeProfit, "stopLoss": openPos.StopLoss})
 		// TODO: Potentially sync SL/TP order status with exchange here? This is complex.
 		// For now, assume SL/TP orders placed previously are still active if the position is open.
 		// A more robust solution would involve querying open orders.

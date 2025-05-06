@@ -10,10 +10,12 @@ import (
 )
 
 var (
-	verbose    = flag.Bool("v", false, "verbose output")
-	short      = flag.Bool("short", false, "run only short tests")
-	timeout    = flag.Duration("timeout", 5*time.Minute, "test timeout")
-	testRegexp = flag.String("run", "", "run only tests matching the regular expression")
+	verbose        = flag.Bool("v", false, "verbose output")
+	short          = flag.Bool("short", false, "run only short tests")
+	timeout        = flag.Duration("timeout", 5*time.Minute, "test timeout")
+	testRegexp     = flag.String("run", "", "run only tests matching the regular expression")
+	backtestOnly   = flag.Bool("backtest", false, "run only backtesting tests")
+	indicatorsOnly = flag.Bool("indicators", false, "run only indicator tests")
 )
 
 func main() {
@@ -41,7 +43,14 @@ func main() {
 	}
 
 	// Add package specifier
-	args = append(args, "./...")
+	switch {
+	case *backtestOnly:
+		args = append(args, "./internal/strategy/backtesting/...", "./internal/strategy/strategies/...")
+	case *indicatorsOnly:
+		args = append(args, "./internal/strategy/indicators/...")
+	default:
+		args = append(args, "./...")
+	}
 
 	// Create command
 	cmd := exec.Command("go", args...)
