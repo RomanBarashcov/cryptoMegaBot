@@ -501,6 +501,44 @@ func (c *Client) GetKlines(ctx context.Context, symbol string, interval string, 
 	return domainKlines, nil
 }
 
+// GetKlinesRange fetches all klines for a symbol/interval between start and end time.
+func (c *Client) GetKlinesRange(ctx context.Context, symbol, interval string, start, end time.Time) ([]*domain.Kline, error) {
+	op := "GetKlinesRange"
+	var allKlines []*domain.Kline
+	const maxLimit = 1500
+	from := start
+
+	for {
+		klines, err := c.futuresClient.NewKlinesService().
+			Symbol(symbol).
+			Interval(interval).
+			StartTime(from.UnixMilli()).
+			EndTime(end.UnixMilli()).
+			Limit(maxLimit).
+			Do(ctx)
+		if err != nil {
+			return nil, c.handleError(ctx, err, op)
+		}
+		if len(klines) == 0 {
+			break
+		}
+		for _, bk := range klines {
+			dk, err := translateBinanceKline(bk, symbol, interval)
+			if err != nil {
+				return nil, c.handleError(ctx, fmt.Errorf("failed to translate historical kline range: %w", err), op)
+			}
+			allKlines = append(allKlines, dk)
+		}
+		last := klines[len(klines)-1]
+		from = time.UnixMilli(last.CloseTime)
+		if from.After(end) || len(klines) < maxLimit {
+			break
+		}
+	}
+
+	return allKlines, nil
+}
+
 // CancelOrder cancels an open order on Binance.
 func (c *Client) CancelOrder(ctx context.Context, symbol string, orderID int64) (*ports.OrderResponse, error) {
 	op := "CancelOrder"
