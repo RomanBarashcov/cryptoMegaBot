@@ -8,16 +8,18 @@ A cryptocurrency trading bot that automatically trades ETH futures on Binance wi
 - **Real-time Price Updates:** Utilizes Binance WebSocket API.
 - **Automated Trading:** Executes trades based on configurable strategies.
 - **Strategy Framework:**
-    - Supports multiple trading strategies (e.g., MA Crossover implemented).
-    - Includes technical indicators (Moving Averages, RSI).
-    - Backtesting engine for strategy evaluation.
+    - Supports multiple trading strategies (MA Crossover and Improved MA Crossover implemented).
+    - Includes technical indicators (Moving Averages, RSI, ATR).
+    - Multi-timeframe analysis for more robust trading decisions.
+    - Backtesting engine with multi-timeframe support.
     - Optimization framework for parameter tuning.
     - Performance analytics module.
 - **Risk Management:**
     - Dedicated Risk Manager module.
     - Configurable stop-loss and take-profit orders.
     - Daily trade limits.
-    - Position sizing (currently fixed default, dynamic planned).
+    - Dynamic position sizing based on volatility (in Improved MA Crossover).
+    - Trailing stop-loss with progressive tightening.
 - **Persistence:** Uses SQLite database via Repository pattern for trade history and positions.
 - **Configuration:** Highly configurable via environment variables (`.env` file).
 - **Concurrency:** Leverages Go's concurrency features for efficient operation.
@@ -29,16 +31,27 @@ A cryptocurrency trading bot that automatically trades ETH futures on Binance wi
 The bot employs a flexible strategy framework allowing different algorithms to be implemented and selected.
 
 - **Core Components:** Located in `internal/strategy`.
-- **Available Indicators:** Moving Averages (SMA/EMA), Relative Strength Index (RSI). More can be added.
-- **Example Strategy:** A Moving Average Crossover strategy (`internal/strategy/strategies/ma_crossover.go`) is provided as an example.
-- **Evaluation Tools:** Includes backtesting (`internal/strategy/backtesting`) and parameter optimization (`internal/strategy/optimization`) capabilities.
+- **Available Indicators:** Moving Averages (SMA/EMA), Relative Strength Index (RSI), Average True Range (ATR). More can be added.
+- **Available Strategies:**
+  - **MA Crossover:** Basic moving average crossover strategy (`internal/strategy/strategies/ma_crossover.go`).
+  - **Improved MA Crossover:** Enhanced strategy with day trading optimizations (`internal/strategy/strategies/improved_ma_crossover.go`).
+    - Multi-timeframe analysis (primary, trend, and scalping timeframes)
+    - Dynamic position sizing based on volatility
+    - Enhanced trailing stop logic with progressive tightening
+    - Advanced exit conditions (volatility drop, consolidation, market close)
+    - Pullback detection for entry in established uptrends
+    - Scalping opportunity detection for more frequent trading
+- **Evaluation Tools:** 
+  - Backtesting (`internal/strategy/backtesting`) with multi-timeframe support
+  - Parameter optimization (`internal/strategy/optimization`) capabilities
+  - Backtest analysis tools (`cmd/analyze_backtests`) for detailed performance metrics
 - **Configuration:** Specific strategy parameters (like MA periods, RSI thresholds) are typically configured via environment variables (see `.env.example` and `config/config.go`).
 - **Default Behavior (Configurable):**
-    - Position Size: Fixed (e.g., 1.0 ETH), configurable via `QUANTITY`. Dynamic sizing is planned.
-    - Stop Loss: Configurable percentage via `STOP_LOSS` (e.g., 0.0025 for 0.25%).
+    - Position Size: Dynamic based on volatility (in Improved MA Crossover) or fixed (configurable via `QUANTITY`).
+    - Stop Loss: Dynamic based on ATR or configurable percentage via `STOP_LOSS` (e.g., 0.0025 for 0.25%).
     - Take Profit: Configurable range via `MIN_PROFIT`, `MAX_PROFIT`.
     - Daily Limit: Max trades per day via `MAX_ORDERS`.
-    - Leverage: Configurable via `LEVERAGE`.
+    - Leverage: Configurable via `LEVERAGE` with dynamic adjustment based on market conditions (in Improved MA Crossover).
 
 ## Technical Requirements
 
@@ -105,6 +118,28 @@ The bot employs a flexible strategy framework allowing different algorithms to b
     docker-compose down
     ```
 
+### Backtesting
+
+The bot includes a comprehensive backtesting framework for strategy evaluation:
+
+1. **Fetch Historical Data:**
+   ```bash
+   go run cmd/fetch_klines/main.go
+   ```
+   This will download historical klines for the configured symbol and timeframes.
+
+2. **Run Backtest:**
+   ```bash
+   go run cmd/backtest_runner/main.go
+   ```
+   This will run the backtest using the configured strategy and parameters.
+
+3. **Analyze Results:**
+   ```bash
+   go run cmd/analyze_backtests/main.go
+   ```
+   This will analyze the backtest results and provide detailed performance metrics.
+
 ## Configuration
 
 Configuration is managed via environment variables, typically loaded from an `.env` file using `godotenv`. See `.env.example` for a full list of available parameters. Key variables include:
@@ -120,9 +155,25 @@ Configuration is managed via environment variables, typically loaded from an `.e
     - `MAX_ORDERS`: Maximum trades per day.
     - `STOP_LOSS`: Stop loss percentage (e.g., `0.0025` for 0.25%).
     - `MIN_PROFIT`, `MAX_PROFIT`: Take profit range percentages.
-- **Strategy Parameters:** (Specific variables depend on the chosen strategy, e.g., MA periods for MA Crossover)
-    - `STRATEGY_NAME`: Identifier for the strategy to use (e.g., `ma_crossover`).
-    - *(Strategy-specific params like `MA_SHORT_PERIOD`, `MA_LONG_PERIOD`, `RSI_PERIOD`, etc.)*
+- **Strategy Parameters:** (Specific variables depend on the chosen strategy)
+    - `STRATEGY_NAME`: Identifier for the strategy to use (e.g., `ma_crossover`, `improved_ma_crossover`).
+    - **MA Crossover Parameters:**
+      - `MA_SHORT_PERIOD`: Period for the fast moving average.
+      - `MA_LONG_PERIOD`: Period for the slow moving average.
+      - `RSI_PERIOD`: Period for the RSI indicator.
+    - **Improved MA Crossover Parameters:**
+      - `FAST_MA_PERIOD`: Period for the fast moving average.
+      - `SLOW_MA_PERIOD`: Period for the slow moving average.
+      - `SIGNAL_PERIOD`: Period for the signal line.
+      - `ATR_PERIOD`: Period for the ATR indicator.
+      - `ATR_MULTIPLIER`: Multiplier for ATR-based stops.
+      - `USE_MULTI_TIMEFRAME`: Whether to use multi-timeframe analysis.
+      - `PRIMARY_TIMEFRAME`: Primary timeframe for trading decisions.
+      - `TREND_TIMEFRAME`: Higher timeframe for trend confirmation.
+      - `USE_SCALP_TIMEFRAME`: Whether to use scalping timeframe.
+      - `SCALP_TIMEFRAME`: Shorter timeframe for scalping opportunities.
+      - `MAX_DAILY_LOSSES`: Maximum number of losing trades per day.
+      - `MAX_HOLDING_TIME`: Maximum time to hold a position.
 - **Technical:**
     - `DB_PATH`: Path to SQLite database file.
     - `LOG_LEVEL`: Logging verbosity (e.g., `debug`, `info`, `warn`, `error`).

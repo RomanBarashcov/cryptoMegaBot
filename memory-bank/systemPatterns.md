@@ -111,6 +111,18 @@ graph TD
 - **Benefits**: Easy to change without code modifications, works well with Docker
 - **Trade-offs**: Limited type safety, requires documentation for users
 
+### Multi-timeframe Analysis
+- **Rationale**: Different timeframes provide different perspectives on market conditions
+- **Benefits**: More robust trading decisions, better trend confirmation
+- **Trade-offs**: Increased complexity, potential for conflicting signals
+- **Implementation**: Primary, trend, and scalping timeframes with specific indicators for each
+
+### Dynamic Position Sizing
+- **Rationale**: Adapt position size to market volatility and risk parameters
+- **Benefits**: Better risk management, adaptation to changing market conditions
+- **Trade-offs**: More complex logic, requires careful tuning
+- **Implementation**: Volatility-based sizing with adjustments for consecutive losses
+
 ## Design Patterns
 
 ### Dependency Injection / Singleton-like Behavior
@@ -130,8 +142,28 @@ graph TD
 
 ### Strategy Pattern
 - **Usage**: Trading strategy implementation (`internal/strategy`).
-- **Implementation**: Defined by the `Strategy` interface in `internal/ports` (or within the strategy module itself). Specific strategies (e.g., `MACrossover`) implement this interface. The `Application Service` uses the selected strategy implementation via its interface.
+- **Implementation**: Defined by the `Strategy` interface in `internal/ports` (or within the strategy module itself). Specific strategies (e.g., `MACrossover`, `ImprovedMACrossover`) implement this interface. The `Application Service` uses the selected strategy implementation via its interface.
 - **Benefit**: Allows different trading algorithms to be developed, tested (backtesting), optimized, and plugged into the application interchangeably.
+- **Recent Enhancement**: Added improved MA Crossover strategy with day trading optimizations, multi-timeframe analysis, and enhanced exit conditions.
+
+### Test-Driven Development (TDD)
+- **Usage**: Development methodology for all new features and bug fixes.
+- **Implementation**: Tests are written before implementing functionality, following the Red-Green-Refactor cycle.
+- **Process**:
+  1. Write failing tests that define expected behavior (Red)
+  2. Implement minimum code to make tests pass (Green)
+  3. Refactor code while ensuring tests continue to pass (Refactor)
+- **Benefits**: Ensures code meets requirements, serves as documentation, prevents regressions, and improves design through early feedback.
+
+### Template Method Pattern
+- **Usage**: Base strategy implementation (`BaseStrategy`).
+- **Implementation**: Common functionality shared across strategies is implemented in a base class, with specific strategies extending it.
+- **Benefit**: Promotes code reuse and consistency across different strategy implementations.
+
+### Chain of Responsibility Pattern
+- **Usage**: Market condition evaluation in strategies.
+- **Implementation**: Multiple checks are performed in sequence (market regime, higher timeframe trend, entry conditions) with early returns if conditions are not met.
+- **Benefit**: Clear separation of concerns and improved readability for complex decision logic.
 
 ## Layer Interactions (Dependency Rule: Arrows point inwards)
 
@@ -176,6 +208,17 @@ graph TD
 5. **Application Service**: Attempts recovery or makes decisions based on error type (e.g., retry, shutdown).
 6. **Logger Adapter**: Writes log message to the configured output (e.g., stdout).
 
+### Backtesting Path (Clean Architecture Flow)
+1. **Backtest Runner (`cmd/backtest_runner`)**: Loads historical klines from CSV files.
+2. **Backtest Runner**: Creates strategy instance with configuration.
+3. **Backtest Runner**: Iterates through klines, simulating trading.
+4. **Strategy**: Evaluates entry/exit conditions for each kline.
+5. **Strategy**: Calculates position size based on volatility.
+6. **Backtest Runner**: Records trades and calculates performance metrics.
+7. **Backtest Runner**: Writes results to CSV files.
+8. **Analysis Tool (`cmd/analyze_backtests`)**: Reads trade results and calculates statistics.
+9. **Analysis Tool**: Provides detailed breakdown by exit reason and other metrics.
+
 ## Data Flow
 
 ### Market Data Flow
@@ -193,14 +236,43 @@ Application Service → Exchange Port → Binance Adapter → Binance API → Bi
 .env File → Config Loader (`config/`) → Config Struct → Injected into Service/Adapters (`cmd/main.go`)
 ```
 
+### Backtesting Data Flow
+```
+CSV Files → Backtest Runner → Strategy → Trade Records → Analysis Tool → Performance Metrics
+```
+
 ## Concurrency Model
 
 ### Goroutines
 - WebSocket handling likely runs in dedicated goroutine(s) within the `Binance Adapter`.
 - Core application logic within the `Service` might process events sequentially or use goroutines depending on the design.
 - Background tasks (e.g., periodic checks) might run in separate goroutines.
+- Backtest runner uses goroutines to load data from multiple timeframes in parallel.
 
 ### Synchronization
 - Mutexes or other sync primitives (`sync` package) are used within adapters (e.g., potentially in `SQLiteRepo` if needed, though `database/sql` handles some pooling) or the `Service` if it manages shared state across concurrent operations.
 - Channels are used for signaling (e.g., shutdown signals via `os/signal`, communication between goroutines).
 - `context.Context` is propagated for request scoping, cancellation, and deadlines, especially for operations involving external calls or background tasks.
+
+## Strategy Implementation
+
+### Base Strategy
+- Provides common functionality for all strategies
+- Handles logging and other shared concerns
+- Implemented in `internal/strategy/strategies/strategy.go`
+
+### MA Crossover Strategy
+- Basic moving average crossover strategy
+- Uses fast and slow moving averages for entry/exit decisions
+- Implemented in `internal/strategy/strategies/ma_crossover.go`
+
+### Improved MA Crossover Strategy
+- Enhanced version with day trading optimizations
+- Features:
+  - Multi-timeframe analysis (primary, trend, and scalping timeframes)
+  - Dynamic position sizing based on volatility
+  - Enhanced trailing stop logic with progressive tightening
+  - Advanced exit conditions (volatility drop, consolidation, market close)
+  - Pullback detection for entry in established uptrends
+  - Scalping opportunity detection for more frequent trading
+- Implemented in `internal/strategy/strategies/improved_ma_crossover.go`

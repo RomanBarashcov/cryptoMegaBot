@@ -61,7 +61,10 @@
 ```
 cryptoMegaBot/
 ├── cmd/                  # Application entry points (e.g., main bot, test runners)
-│   └── ...
+│   ├── analyze_backtests/ # Backtest analysis tools
+│   ├── backtest_runner/   # Backtesting runner
+│   ├── fetch_klines/      # Data fetching utilities
+│   └── test_runner/       # Test execution utilities
 ├── config/
 │   └── config.go         # Configuration loading and validation
 ├── data/
@@ -80,9 +83,9 @@ cryptoMegaBot/
 │   └── strategy/         # Trading strategy components
 │       ├── analytics/     # Performance calculation
 │       ├── backtesting/   # Backtesting engine
-│       ├── indicators/    # Technical indicators (MA, RSI, etc.)
+│       ├── indicators/    # Technical indicators (MA, RSI, ATR, etc.)
 │       ├── optimization/  # Strategy parameter optimization
-│       └── strategies/    # Specific strategy implementations (e.g., MA Crossover)
+│       └── strategies/    # Specific strategy implementations (e.g., MA Crossover, Improved MA Crossover)
 ├── memory-bank/          # Project context documentation (this folder)
 │   └── ...
 ├── .env                  # Environment configuration (local, not in repo)
@@ -203,3 +206,30 @@ cryptoMegaBot/
 - Context added at each level
 - Recovery from panics in critical goroutines
 - Graceful degradation when possible
+
+### Test-Driven Development
+- Tests written before implementing functionality
+- Main test cases cover expected behavior
+- Edge cases handle boundary conditions and error scenarios
+- Red-Green-Refactor cycle followed:
+  1. Write a failing test (Red)
+  2. Implement minimum code to make test pass (Green)
+  3. Refactor while keeping tests passing (Refactor)
+- Tests serve as documentation of expected behavior
+- Regression tests implemented for bug fixes
+
+### Strategy Implementation
+- Strategy pattern for trading algorithms
+- Interface-based design for strategy interchangeability
+- Technical indicators as reusable components
+- Backtesting framework for strategy evaluation
+- Multi-timeframe analysis for more robust trading decisions
+- Day trading optimizations with specialized exit conditions
+
+### Backtesting Framework
+- Support for multiple timeframes
+- Dynamic position sizing based on volatility
+- ATR-based stop loss calculation
+- Performance metrics calculation (win rate, profit factor, Sharpe ratio)
+- Trade history recording for analysis
+- Specialized analysis tools for day trading metrics

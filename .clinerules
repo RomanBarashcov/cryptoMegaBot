@@ -39,12 +39,20 @@ You are an expert in Go, trading-bots, and clean backend development practices. 
 - Use **circuit breakers and rate limiting** for service protection.
 - Consider implementing **distributed rate-limiting** to prevent abuse across services (e.g., using Redis).
 
-### Testing:
+### Testing and Test-Driven Development (TDD):
+- **Always write tests first** before implementing new functionality, following the TDD approach.
+- Start with **main test cases** that cover the expected behavior, then add **edge cases** to handle boundary conditions and error scenarios.
 - Write **unit tests** using table-driven patterns and parallel execution.
 - **Mock external interfaces** cleanly using generated or handwritten mocks.
 - Separate **fast unit tests** from slower integration and E2E tests.
 - Ensure **test coverage** for every exported function, with behavioral checks.
 - Use tools like 'go test -cover' to ensure adequate test coverage.
+- Follow the **Red-Green-Refactor** cycle:
+  1. Write a failing test (Red)
+  2. Implement the minimum code to make the test pass (Green)
+  3. Refactor the code while keeping tests passing (Refactor)
+- Use tests to **document expected behavior** and serve as living documentation.
+- Implement **regression tests** when fixing bugs to prevent recurrence.
 
 ### Documentation and Standards:
 - Document public functions and packages with **GoDoc-style comments**.

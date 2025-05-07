@@ -17,9 +17,11 @@
 - ✅ Basic Logging System (StdLogger adapter)
 - ✅ Performance Metrics Collection (via Analytics module)
 - ✅ Risk Management Module (`internal/risk`)
+- ✅ Multi-timeframe analysis for trading decisions
 
 ### Trading Features
 - ✅ Fixed position size trading (default, configurable)
+- ✅ Dynamic position sizing based on volatility (implemented in improved strategy)
 - ✅ Leverage configuration
 - ✅ Stop-loss orders
 - ✅ Take-profit orders
@@ -27,10 +29,16 @@
 - ✅ Position tracking in database
 - ✅ Trade history recording
 - ✅ Balance checking before trades
-- ✅ Technical Indicators (Moving Averages, RSI implemented)
-- ✅ Basic Strategy Implementation (e.g., MA Crossover)
+- ✅ Technical Indicators (Moving Averages, RSI, ATR implemented)
+- ✅ Basic Strategy Implementation (MA Crossover)
+- ✅ Improved Strategy Implementation (Improved MA Crossover with day trading optimizations)
 - ✅ Backtesting Framework (`internal/strategy/backtesting`)
+- ✅ Multi-timeframe backtesting support
 - ✅ Strategy Optimization Framework (`internal/strategy/optimization`)
+- ✅ Advanced exit conditions (volatility drop, consolidation, market close)
+- ✅ Enhanced trailing stop logic with progressive tightening
+- ✅ Pullback detection for entry in established uptrends
+- ✅ Scalping opportunity detection for more frequent trading
 
 ### Technical Implementation
 - ✅ SQLite database integration (via Repository pattern)
@@ -42,21 +50,20 @@
 - ✅ Docker containerization
 - ✅ Unit Testing (Partial coverage across modules)
 - ✅ Clean Architecture Structure (Ports & Adapters)
+- ✅ Backtest analysis tools with day trading metrics
 
 ## What's Left to Build
 
 ### Core Functionality
-- ❌ Dynamic position sizing (Risk Manager exists, but dynamic logic TBD)
+- ❌ Dynamic position sizing in Risk Manager (currently implemented in strategy only)
 - ❌ Advanced/Comprehensive logging system (Current is basic)
 - ❌ Notification system for important events
 - ❌ Circuit breaker for unusual market conditions (Risk Manager exists, but circuit breaker logic TBD)
 
 ### Trading Features
-- ❌ Volume analysis for entry/exit decisions
-- ❌ Multiple timeframe analysis
-- ❌ Dynamic take-profit based on market conditions
-- ❌ Trailing stop-loss implementation
-- ❌ Risk-adjusted position sizing (related to dynamic sizing)
+- ❌ Volume analysis for entry/exit decisions (partially implemented in improved strategy)
+- ❌ Trailing stop-loss implementation at the service level (currently in strategy only)
+- ❌ Risk-adjusted position sizing at the service level (currently in strategy only)
 - ❌ More advanced strategies beyond MA Crossover
 
 ### Technical Implementation
@@ -71,18 +78,19 @@
 ## Current Status
 
 ### Project Status: Beta (estimated)
-The bot has core functionality, basic strategies, indicators, risk management, and testing in place. Requires further refinement, testing, and feature completion before production.
+The bot has core functionality, basic and improved strategies, indicators, risk management, and testing in place. Requires further refinement, testing, and feature completion before production.
 
 ### Development Status
-- **Last Major Update**: Implementation of strategy framework, indicators, risk manager, analytics, and testing infrastructure.
-- **Current Focus**: Refining existing strategies, improving error handling, potentially adding dynamic sizing.
-- **Next Milestone**: Implementing dynamic position sizing or more advanced strategies.
+- **Last Major Update**: Implementation of improved MA Crossover strategy with day trading optimizations, multi-timeframe analysis, and enhanced backtesting framework.
+- **Current Focus**: Finalizing improved strategy implementation, refining backtesting analysis, potentially adding dynamic sizing to Risk Manager.
+- **Next Milestone**: Implementing dynamic position sizing in Risk Manager or more advanced strategies.
 
 ### Testing Status
 - **Unit Tests**: Partially implemented across core modules (Service, Repository, Risk, Strategy, Analytics, Optimizer). Coverage needs improvement.
 - **Integration Tests**: Not yet implemented.
 - **Manual Testing**: Basic functionality tested in testnet environment.
-- **Backtesting**: Framework available for strategy evaluation.
+- **Backtesting**: Framework available for strategy evaluation with multi-timeframe support.
+- **TDD Approach**: Implementing Test-Driven Development methodology with tests written before code implementation, following the Red-Green-Refactor cycle.
 
 ### Deployment Status
 - **Environment**: Local development only
@@ -106,12 +114,14 @@ The bot has core functionality, basic strategies, indicators, risk management, a
 1. **Trading Strategy Refinement**: Implemented strategies (e.g., MA Crossover) may need tuning or replacement with more robust ones.
    - **Impact**: Suboptimal trading decisions.
    - **Workaround**: Use backtesting/optimization frameworks; configure existing strategies carefully.
-   - **Planned Fix**: Develop and test more advanced strategies.
+   - **Planned Fix**: Continue developing and testing more advanced strategies.
+   - **Progress**: Improved MA Crossover strategy with day trading optimizations implemented.
 
 2. **Position Sizing**: Fixed position size doesn't account for volatility
    - **Impact**: Risk may be too high in volatile conditions
    - **Workaround**: Manually adjust position size in configuration
    - **Planned Fix**: Implement dynamic position sizing based on volatility
+   - **Progress**: Dynamic position sizing implemented in improved strategy, needs to be moved to Risk Manager.
 
 ### Minor Issues
 1. **Logging Verbosity/Structure**: Basic logging exists, but may lack sufficient detail or structure for complex debugging.
@@ -135,9 +145,10 @@ The bot has core functionality, basic strategies, indicators, risk management, a
    - **Rationale**: Avoid obviously bad entries.
    - **Outcome**: Minor improvement.
 
-3. **Current Approach**: Strategy pattern implementation with technical indicators (MA, RSI), specific strategies (MA Crossover), backtesting, and optimization frameworks.
+3. **Current Approach**: Strategy pattern implementation with technical indicators (MA, RSI, ATR), specific strategies (MA Crossover, Improved MA Crossover), backtesting, and optimization frameworks.
    - **Rationale**: Enable structured strategy development, testing, and selection.
    - **Outcome**: Significantly more robust and extensible strategy system.
+   - **Recent Improvement**: Added multi-timeframe analysis, day trading optimizations, and enhanced exit conditions.
 
 4. **Planned Approach**: Develop/integrate more advanced strategies, potentially dynamic TP/SL or volume analysis.
    - **Rationale**: Improve profitability and adaptability.
@@ -152,11 +163,12 @@ The bot has core functionality, basic strategies, indicators, risk management, a
    - **Rationale**: Limit daily exposure.
    - **Outcome**: Better daily risk control.
 
-3. **Current Approach**: Dedicated Risk Manager module (`internal/risk`) handling daily limits and potentially other checks. Fixed position sizing still default.
+3. **Current Approach**: Dedicated Risk Manager module (`internal/risk`) handling daily limits and potentially other checks. Dynamic position sizing implemented in strategy.
    - **Rationale**: Centralize risk logic.
    - **Outcome**: Cleaner architecture, foundation for advanced rules.
+   - **Recent Improvement**: Added volatility-based position sizing in improved strategy.
 
-4. **Planned Approach**: Implement dynamic position sizing (potentially volatility-based or risk-adjusted) within the Risk Manager. Consider circuit breakers.
+4. **Planned Approach**: Implement dynamic position sizing (volatility-based or risk-adjusted) within the Risk Manager. Consider circuit breakers.
    - **Rationale**: Adapt risk dynamically to market conditions and capital.
    - **Status**: Planning/Development.
 
@@ -193,24 +205,33 @@ The bot has core functionality, basic strategies, indicators, risk management, a
 - Daily trade limit enforcement
 
 ### Milestone 3: Strategy & Analysis Framework (Completed)
-- Technical indicators implementation (MA, RSI)
+- Technical indicators implementation (MA, RSI, ATR)
 - Strategy pattern implementation
 - MA Crossover strategy example
 - Backtesting framework
 - Optimization framework
 - Performance analytics module
 
-### Milestone 4: Robustness & Risk Management (Partially Completed / In Progress)
+### Milestone 4: Advanced Strategy Implementation (Partially Completed / In Progress)
+- ✅ Improved MA Crossover strategy with day trading optimizations (Completed)
+- ✅ Multi-timeframe analysis (Completed)
+- ✅ Enhanced exit conditions (volatility drop, consolidation, market close) (Completed)
+- ✅ Dynamic position sizing based on volatility (Completed in strategy)
+- ❌ Move dynamic position sizing to Risk Manager (Planned)
+- ❌ Implement more advanced strategies (Planned)
+
+### Milestone 5: Robustness & Risk Management (Partially Completed / In Progress)
 - ✅ WebSocket reconnection logic (Completed earlier)
 - ✅ Basic Logging System (Completed)
 - ✅ Risk Manager Module (Foundation Completed)
 - ❌ Comprehensive error handling (Ongoing)
 - ❌ Circuit breaker implementation (Planned)
-- ❌ Dynamic Position Sizing (Planned)
+- ❌ Dynamic Position Sizing in Risk Manager (Planned)
 
-### Milestone 5: Testing & Optimization (Partially Completed / In Progress)
+### Milestone 6: Testing & Optimization (Partially Completed / In Progress)
 - ✅ Performance metrics collection (Completed via Analytics)
 - ✅ Unit Testing Infrastructure (Completed, coverage ongoing)
+- ✅ Multi-timeframe backtesting (Completed)
 - ❌ Comprehensive Unit Test Coverage (Ongoing)
 - ❌ Integration Testing (Planned)
 - ❌ Database query optimization (Planned)

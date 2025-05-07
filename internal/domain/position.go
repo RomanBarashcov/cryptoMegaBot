@@ -21,6 +21,10 @@ type Position struct {
 	StopLossOrderID   *string     `db:"stop_loss_order_id"`
 	TakeProfitOrderID *string     `db:"take_profit_order_id"`
 	CloseReason       CloseReason `db:"close_reason"` // Reason for closing (SL, TP, Manual, etc.)
+
+	// Trailing stop parameters
+	TrailingStopDistance float64 `db:"trailing_stop_distance"` // Distance for trailing stop in price units
+	TrailingStopPrice    float64 `db:"trailing_stop_price"`    // Current trailing stop price level
 }
 
 // IsOpen checks if the position status is open.

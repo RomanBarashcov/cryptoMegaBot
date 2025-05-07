@@ -42,6 +42,14 @@ func (m *MockStrategy) Name() string {
 	return "MockStrategy"
 }
 
+func (m *MockStrategy) GetPositionSize(ctx context.Context, klines []*domain.Kline, availableFunds float64) float64 {
+	return 0.1 // Return a default value for testing
+}
+
+func (m *MockStrategy) GetATR(ctx context.Context, klines []*domain.Kline) (float64, error) {
+	return 100.0, nil // Return a default value for testing
+}
+
 func TestOptimizer(t *testing.T) {
 	// Create test data
 	klines := []*domain.Kline{

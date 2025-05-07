@@ -320,20 +320,43 @@ func (c *Client) PlaceTakeProfitMarketOrder(ctx context.Context, symbol string, 
 	op := "PlaceTakeProfitMarketOrder"
 	binanceSide := futures.SideType(side)
 
+	// Add detailed logging before order placement
+	c.logger.Info(ctx, op+": Attempting to place take profit order", map[string]interface{}{
+		"symbol":    symbol,
+		"side":      side,
+		"quantity":  quantity,
+		"stopPrice": stopPrice,
+		"type":      "TAKE_PROFIT_MARKET",
+	})
+
 	order, err := c.futuresClient.NewCreateOrderService().
 		Symbol(symbol).
 		Side(binanceSide).
 		Type(futures.OrderTypeTakeProfitMarket).
 		Quantity(quantity).
 		StopPrice(stopPrice).
-		ClosePosition(true). // Ensure it closes position, adjust if needed for SL/TP logic
+		ClosePosition(true).
 		Do(ctx)
 	if err != nil {
+		// Enhanced error logging
+		c.logger.Error(ctx, err, op+": Failed to place take profit order", map[string]interface{}{
+			"symbol":    symbol,
+			"side":      side,
+			"quantity":  quantity,
+			"stopPrice": stopPrice,
+		})
 		return nil, c.handleError(ctx, err, op)
 	}
 
 	resp := translateOrderResponse(order)
-	c.logger.Info(ctx, op+" successful", map[string]interface{}{"symbol": symbol, "side": side, "quantity": quantity, "stopPrice": stopPrice, "orderID": resp.OrderID})
+	c.logger.Info(ctx, op+" successful", map[string]interface{}{
+		"symbol":    symbol,
+		"side":      side,
+		"quantity":  quantity,
+		"stopPrice": stopPrice,
+		"orderID":   resp.OrderID,
+		"status":    resp.Status,
+	})
 	return resp, nil
 }
 

@@ -1,73 +1,239 @@
 package main
 
 import (
+	"cryptoMegaBot/internal/domain"
 	"cryptoMegaBot/internal/utils"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"text/tabwriter"
 )
 
 func main() {
-	files, err := os.ReadDir("data")
+	// Find all backtest trade files
+	files, err := findBacktestFiles("data", "improved_backtest_trades")
 	if err != nil {
-		fmt.Println("Error reading data dir:", err)
-		os.Exit(1)
+		log.Fatalf("Error finding backtest files: %v", err)
 	}
 
-	fmt.Printf("%-22s %-8s %-8s %-8s %-8s %-10s %-8s %-8s\n", "File", "Trades", "WinRate", "AvgWin", "AvgLoss", "TotalPnL", "MaxDD", "TP%")
+	if len(files) == 0 {
+		log.Println("No backtest files found. Run the improved backtest runner first.")
+		return
+	}
+
+	// Create a tabwriter for formatted output
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', tabwriter.AlignRight|tabwriter.Debug)
+	fmt.Fprintln(w, "File\tTrades\tWinRate\tAvgWin\tAvgLoss\tTotalPnL\tMaxDD\tTP%\t")
+
+	// Process each file
 	for _, file := range files {
-		if !strings.HasPrefix(file.Name(), "backtest_trades_tp") || !strings.HasSuffix(file.Name(), ".csv") {
-			continue
-		}
-		trades, err := utils.ReadTradesFromCSV(filepath.Join("data", file.Name()))
+		trades, err := utils.ReadTradesFromCSV(file)
 		if err != nil {
-			fmt.Println("Error reading", file.Name(), ":", err)
+			log.Printf("Error reading trades from %s: %v", file, err)
 			continue
 		}
-		total, wins, losses := 0, 0, 0
-		totalPnL, winSum, lossSum := 0.0, 0.0, 0.0
-		maxDD, balance, peak := 0.0, 0.0, 0.0
-		tpCount := 0
-		for _, t := range trades {
-			total++
-			totalPnL += t.PNL
-			balance += t.PNL
-			if balance > peak {
-				peak = balance
+
+		// Calculate statistics
+		stats := calculateTradeStats(trades)
+
+		// Extract TP value from filename (e.g., improved_backtest_trades_tp1.5.csv -> 1.5)
+		tp := extractTPFromFilename(file)
+
+		// Print statistics
+		fmt.Fprintf(w, "%s\t%d\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t\n",
+			filepath.Base(file),
+			stats.TotalTrades,
+			stats.WinRate*100,
+			stats.AvgWin,
+			stats.AvgLoss,
+			stats.TotalPnL,
+			stats.MaxDrawdown,
+			tp,
+		)
+	}
+	w.Flush()
+
+	// Print additional analysis
+	fmt.Println("\n## Trend Reversal Analysis")
+	analyzeTrendReversals(files)
+}
+
+// TradeStats holds statistics about a set of trades
+type TradeStats struct {
+	TotalTrades   int
+	WinningTrades int
+	LosingTrades  int
+	WinRate       float64
+	AvgWin        float64
+	AvgLoss       float64
+	TotalPnL      float64
+	MaxDrawdown   float64
+}
+
+// calculateTradeStats calculates statistics for a set of trades
+func calculateTradeStats(trades []*domain.Trade) TradeStats {
+	var stats TradeStats
+	stats.TotalTrades = len(trades)
+
+	if stats.TotalTrades == 0 {
+		return stats
+	}
+
+	// Calculate win/loss stats
+	var winningPnL, losingPnL float64
+	var maxBalance, currentBalance, maxDrawdown float64
+	currentBalance = 1000.0 // Assume starting balance of 1000
+	maxBalance = currentBalance
+
+	for _, trade := range trades {
+		stats.TotalPnL += trade.PNL
+		currentBalance += trade.PNL
+
+		// Update max balance and drawdown
+		if currentBalance > maxBalance {
+			maxBalance = currentBalance
+		}
+
+		drawdown := (maxBalance - currentBalance) / maxBalance
+		if drawdown > maxDrawdown {
+			maxDrawdown = drawdown
+		}
+
+		if trade.PNL > 0 {
+			stats.WinningTrades++
+			winningPnL += trade.PNL
+		} else {
+			stats.LosingTrades++
+			losingPnL += trade.PNL
+		}
+	}
+
+	// Calculate averages
+	if stats.WinningTrades > 0 {
+		stats.AvgWin = winningPnL / float64(stats.WinningTrades)
+	}
+	if stats.LosingTrades > 0 {
+		stats.AvgLoss = losingPnL / float64(stats.LosingTrades)
+	}
+	stats.WinRate = float64(stats.WinningTrades) / float64(stats.TotalTrades)
+	stats.MaxDrawdown = maxDrawdown
+
+	return stats
+}
+
+// findBacktestFiles finds all backtest trade files in the specified directory
+func findBacktestFiles(dir, prefix string) ([]string, error) {
+	var files []string
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasPrefix(entry.Name(), prefix) && strings.HasSuffix(entry.Name(), ".csv") {
+			files = append(files, filepath.Join(dir, entry.Name()))
+		}
+	}
+
+	// Sort files by TP value
+	sort.Slice(files, func(i, j int) bool {
+		tpi := extractTPFromFilename(files[i])
+		tpj := extractTPFromFilename(files[j])
+		return tpi < tpj
+	})
+
+	return files, nil
+}
+
+// extractTPFromFilename extracts the TP value from a filename
+// e.g., improved_backtest_trades_tp1.5.csv -> 1.5
+func extractTPFromFilename(filename string) float64 {
+	base := filepath.Base(filename)
+	parts := strings.Split(base, "_tp")
+	if len(parts) < 2 {
+		return 0
+	}
+
+	tpStr := strings.TrimSuffix(parts[1], ".csv")
+	var tp float64
+	fmt.Sscanf(tpStr, "%f", &tp)
+	return tp
+}
+
+// analyzeTrendReversals analyzes the trend reversal exits
+func analyzeTrendReversals(files []string) {
+	for _, file := range files {
+		trades, err := utils.ReadTradesFromCSV(file)
+		if err != nil {
+			log.Printf("Error reading trades from %s: %v", file, err)
+			continue
+		}
+
+		// Count trades by close reason
+		closeReasonCounts := make(map[domain.CloseReason]int)
+		closeReasonPnL := make(map[domain.CloseReason]float64)
+
+		for _, trade := range trades {
+			closeReasonCounts[trade.CloseReason]++
+			closeReasonPnL[trade.CloseReason] += trade.PNL
+		}
+
+		// Print trend reversal statistics
+		fmt.Printf("\nFile: %s\n", filepath.Base(file))
+		fmt.Println("Close Reason\tCount\tTotal PnL\tAvg PnL")
+
+		// Sort reasons for consistent output
+		var reasons []domain.CloseReason
+		for reason := range closeReasonCounts {
+			reasons = append(reasons, reason)
+		}
+		sort.Slice(reasons, func(i, j int) bool {
+			return string(reasons[i]) < string(reasons[j])
+		})
+
+		for _, reason := range reasons {
+			count := closeReasonCounts[reason]
+			totalPnL := closeReasonPnL[reason]
+			avgPnL := 0.0
+			if count > 0 {
+				avgPnL = totalPnL / float64(count)
 			}
-			dd := (peak - balance)
-			if dd > maxDD {
-				maxDD = dd
+
+			fmt.Printf("%s\t%d\t%.2f\t%.2f\n", reason, count, totalPnL, avgPnL)
+		}
+
+		// Print additional analysis for day trading specific exit reasons
+		fmt.Println("\nDay Trading Exit Analysis:")
+		dayTradingExits := []domain.CloseReason{
+			domain.CloseReasonVolatilityDrop,
+			domain.CloseReasonConsolidation,
+			domain.CloseReasonMarketClose,
+		}
+
+		dayTradingExitCount := 0
+		dayTradingExitPnL := 0.0
+
+		for _, reason := range dayTradingExits {
+			count := closeReasonCounts[reason]
+			totalPnL := closeReasonPnL[reason]
+			dayTradingExitCount += count
+			dayTradingExitPnL += totalPnL
+
+			if count > 0 {
+				fmt.Printf("%s: %d trades, PnL: %.2f, Avg: %.2f\n",
+					reason, count, totalPnL, totalPnL/float64(count))
 			}
-			if t.PNL > 0 {
-				wins++
-				winSum += t.PNL
-			} else if t.PNL < 0 {
-				losses++
-				lossSum += t.PNL
-			}
-			if strings.Contains(strings.ToLower(string(t.CloseReason)), "take") {
-				tpCount++
-			}
 		}
-		winRate := 0.0
-		if total > 0 {
-			winRate = float64(wins) / float64(total)
+
+		if dayTradingExitCount > 0 {
+			fmt.Printf("All Day Trading Exits: %d trades, PnL: %.2f, Avg: %.2f\n",
+				dayTradingExitCount, dayTradingExitPnL, dayTradingExitPnL/float64(dayTradingExitCount))
+		} else {
+			fmt.Println("No day trading specific exits found")
 		}
-		avgWin := 0.0
-		if wins > 0 {
-			avgWin = winSum / float64(wins)
-		}
-		avgLoss := 0.0
-		if losses > 0 {
-			avgLoss = lossSum / float64(losses)
-		}
-		tpPerc := 0.0
-		if total > 0 {
-			tpPerc = float64(tpCount) / float64(total) * 100
-		}
-		fmt.Printf("%-22s %-8d %-8.2f %-8.2f %-8.2f %-10.2f %-8.2f %-8.2f\n",
-			file.Name(), total, winRate*100, avgWin, avgLoss, totalPnL, maxDD, tpPerc)
 	}
 }

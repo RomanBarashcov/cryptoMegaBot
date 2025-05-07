@@ -19,6 +19,12 @@ type Strategy interface {
 
 	// Name returns the name of the strategy
 	Name() string
+
+	// GetPositionSize calculates the optimal position size based on volatility
+	GetPositionSize(ctx context.Context, klines []*domain.Kline, availableFunds float64) float64
+
+	// GetATR returns the current ATR value
+	GetATR(ctx context.Context, klines []*domain.Kline) (float64, error)
 }
 
 // BaseStrategy provides common functionality for strategies
@@ -31,4 +37,9 @@ func NewBaseStrategy(logger ports.Logger) *BaseStrategy {
 	return &BaseStrategy{
 		logger: logger,
 	}
+}
+
+// GetLogger returns the strategy's logger
+func (b *BaseStrategy) GetLogger() ports.Logger {
+	return b.logger
 }

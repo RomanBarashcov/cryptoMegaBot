@@ -108,14 +108,16 @@ func Backtest(ctx context.Context, strategy strategies.Strategy, klines []*domai
 		// Check if we should open a new position
 		if currentPosition == nil && strategy.ShouldEnterTrade(ctx, historicalKlines, currentKline.Close) {
 			currentPosition = &domain.Position{
-				Symbol:     config.Symbol,
-				EntryPrice: currentKline.Close,
-				Quantity:   config.PositionSize,
-				Leverage:   config.Leverage,
-				StopLoss:   currentKline.Close * (1 - config.StopLoss),
-				TakeProfit: currentKline.Close * (1 + config.TakeProfit),
-				EntryTime:  currentKline.OpenTime,
-				Status:     domain.StatusOpen,
+				Symbol:               config.Symbol,
+				EntryPrice:           currentKline.Close,
+				Quantity:             config.PositionSize,
+				Leverage:             config.Leverage,
+				StopLoss:             currentKline.Close * (1 - config.StopLoss),
+				TakeProfit:           currentKline.Close * (1 + config.TakeProfit),
+				EntryTime:            currentKline.OpenTime,
+				Status:               domain.StatusOpen,
+				TrailingStopPrice:    0, // Will be initialized when profit reaches threshold
+				TrailingStopDistance: 0, // Will be set when trailing stop is activated
 			}
 			result.TotalTrades++
 		}
@@ -142,9 +144,21 @@ func Backtest(ctx context.Context, strategy strategies.Strategy, klines []*domai
 	return result, nil
 }
 
-// calculatePNL calculates the profit/loss for a position
+// calculatePNL calculates the profit/loss for a position including trading fees
 func calculatePNL(position *domain.Position, currentPrice float64) float64 {
-	return (currentPrice - position.EntryPrice) * position.Quantity * float64(position.Leverage)
+	// Trading fee (0.1% for maker/taker on Binance futures)
+	const tradingFee = 0.001
+
+	// Calculate raw PNL
+	rawPnl := (currentPrice - position.EntryPrice) * position.Quantity * float64(position.Leverage)
+
+	// Calculate fees (entry and exit)
+	entryFee := position.EntryPrice * position.Quantity * tradingFee
+	exitFee := currentPrice * position.Quantity * tradingFee
+	totalFees := (entryFee + exitFee) * float64(position.Leverage)
+
+	// Net PNL after fees
+	return rawPnl - totalFees
 }
 
 // calculateSharpeRatio calculates the Sharpe ratio for a series of returns
